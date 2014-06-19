@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 #               OpenCenter(TM) is Copyright 2013 by Rackspace US, Inc.
+#               Copyright (C) 2014 Okinawa Open Laboratory
 ##############################################################################
 #
 # OpenCenter is licensed under the Apache License, Version 2.0 (the "License");
@@ -160,7 +161,8 @@ class ChefClientBackend(opencenter.backends.Backend):
                 else:  # this is agent, make sure we have chef stuff
                     ocaom = 'opencenter_agent_output_modules'
 
-                    if not ocaom in node['attrs'] and \
+                    #if not ocaom in node['attrs'] and \
+                    if ocaom in node['attrs'] and \
                             not 'chef' in node['attrs'][ocaom]:
                         should_add = False
 
