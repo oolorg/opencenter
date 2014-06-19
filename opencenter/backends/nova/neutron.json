@@ -1,0 +1,11 @@
+{
+    "network_provider": "nova",
+    "neutron_plugin": "ovs",
+    "neutron_ovs_network_type": "gre",
+    "neutron_ovs_ext_bridge": "br-ex",
+    "neutron_ovs_ext_if": "eth0",
+    "neutron_ofc_host": "127.0.0.1",
+    "neutron_lbaas_enabled": "True",
+    "neutron_of_if": "none"
+}
+

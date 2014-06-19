@@ -58,6 +58,13 @@ from opencenter.webapp.tasks import bp as tasks_bp
 
 # api = api_from_models()
 
+# tenant-s 20140528
+from opencenter.backends.nova import ool_rm_if
+TOKENKEYWORD = "iPlanetDirectoryPro="
+
+class Invalid_Key(Exception):
+    pass
+# tenant-e 20140528
 
 # Stolen: http://code.activestate.com/recipes/\
 #         577911-context-manager-for-a-daemon-pid-file/
@@ -321,6 +328,31 @@ class WebServer(Flask):
                 retval = set()
                 for x in (trans[tx] for tx in trans.keys() if tx > txid):
                     retval.update(x)
+                #tenant start
+                #target_tenant = 'test2-tenant' #Temporary
+                #log("start")
+                target_tenant = request.headers.get('tenant')
+                if what == 'nodes' and not generic.is_adminTenant(target_tenant):
+
+                    try:
+                        node_objects = get_objectlist_not_reserved_tenant(target_tenant)
+
+                        remove_ids = set()
+
+                        for node_id in retval:
+                            for obj in node_objects:
+                                #self._logger.debug('obj = %s' % obj)
+                                if int(node_id) == obj['id']:
+                                    #self._logger.debug('obj = %s' % obj)
+                                    remove_ids.add(node_id)
+                                    break
+                    
+                        retval.difference_update(remove_ids)
+
+                    except Invalid_Key:
+                        retval = set()
+                #log("end")
+                #tenant end
 
                 return generic.http_response(
                     200, 'Updated %s' % what.title(),
@@ -328,6 +360,62 @@ class WebServer(Flask):
                                        'txid': '%.6f' % current_txid},
                        what: list(retval)})
             return f
+
+        # tenant 0528
+        def get_objectlist_not_reserved_tenant(target_tenant):
+            api = api_from_models()
+            
+            # get a nodes of mismatch attr tenant
+            query = 'attrs.tenant!=null and attrs.tenant!="%s" and attrs.tenant!="any"' % target_tenant
+            node_objects = api.nodes_query(query)
+            
+            # get a nodes of server and sdn box
+            query = '"agent" in facts.backends and attrs.tenant!="any"'
+            node_obj_agents = api.nodes_query(query)
+            
+            # get devide list that are assigned to the tenannt from the resouce managers
+            ori=ool_rm_if.ool_rm_if()
+
+            cookie_data = request.headers.get('Cookie')
+            tokenId = ''
+            cookie_split=cookie_data.split(';')
+            for cookie in cookie_split:
+                index = cookie.find(TOKENKEYWORD)
+                if index != -1:
+                    tokenId = cookie[index + len(TOKENKEYWORD):]
+                    break
+
+            if 0 == len(tokenId):
+                logging.debug('facts_please.py:create() not find tokenID')
+                return node_objects
+
+            #logging.debug('TokenID=%s' % tokenId)
+            #logging.debug('User-Agent=%s' % flask.request.headers.get('User-Agent'))
+            #logging.debug('tenant=%s' % request.headers.get('tenant'))
+            ori.set_auth(tokenId)
+            data = ori.get_tenant('', target_tenant)
+
+            #logging.debug('data = %s' % data)
+
+            # return err
+            if -1 == data[0]:
+                logging.debug("ori.get_tenant err data=%s" %(data))
+                raise Invalid_Key
+
+            # set result
+            result = data[1]
+        
+            # Add to list server & SDN box that are not reserved by the tenant
+            for obj in node_obj_agents:
+                for node in result:
+                    if obj['name'] == node['device_name']:
+                        break
+                else:
+                    #logging.debug('obj = %s' % obj)
+                    node_objects.append(obj)
+            
+            return node_objects
+        # tenant 0528
 
         def root_schema():
             schema = {'schema': {'objects': self.registered_models}}

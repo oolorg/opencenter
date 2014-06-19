@@ -38,7 +38,7 @@
         }
     },
     "horizon": {
-      "theme": "Rackspace"
+      "theme": "default"
     },
     "glance": {
         "image" : {
@@ -64,7 +64,8 @@
             "fixed_range": "${facts['nova_vm_fixed_range']}",
             "dmz_cidr": "${facts['nova_dmz_cidr']}",
             "multi_host": true,
-            "public_interface": "${facts['nova_public_if']}"
+            "public_interface": "${facts['nova_public_if']}",
+            "provider": "${facts['network_provider']}"
         },
         "apply_patches": true,
         "networks": [
@@ -84,6 +85,25 @@
         "management": "${facts['osops_mgmt']}",
         "nova": "${facts['osops_nova']}",
         "public": "${facts['osops_public']}"
+    },
+    "quantum": {
+        "plugin": "${facts['neutron_plugin']}",
+        "ovs": {
+            "network_type": "${facts['neutron_ovs_network_type']}",
+            "external_bridge": "${facts['neutron_ovs_ext_bridge']}",
+            "external_interface": "${facts['neutron_ovs_ext_if']}"
+        },
+        "nec": {
+            "ofc_host": "${facts['neutron_ofc_host']}",
+            "openflow_interface": "${facts['neutron_of_if']}"
+        },
+        "ryu": {
+            "ofc_host": "${facts['neutron_ofc_host']}",
+            "tunnel_if": "${facts['nova_vm_fixed_if']}"
+        },
+        "lbaas": {
+            "enabled": "${facts['neutron_lbaas_enabled']}"
+        }
     },
     "package_component": "folsom"
 }

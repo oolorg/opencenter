@@ -34,10 +34,6 @@ from opencenter.db.api import api_from_models
 from opencenter.webapp.auth import requires_auth
 from opencenter.webapp import utility
 
-#tenant start
-from flask import request
-#tenant end
-
 #add_backup###################
 import logging
 from opencenter.backends.nova import ool_rm_if
@@ -53,9 +49,7 @@ related_notifications = {
     "facts": {"node_id": "nodes"}
 }
 
-# Tenant-s 20140528
-TOKENKEYWORD = "iPlanetDirectoryPro="
-# Tenant-e 20140528
+
 
 def singularize(what):
     return what[:-1]
@@ -100,14 +94,6 @@ def http_conflict(result=409, msg=None, **kwargs):
         msg = 'Conflict'
     return http_response(result, msg, **kwargs)
 
-#tenant start
-def is_adminTenant( tenant ):
-    if tenant is None :
-        return True
-    elif tenant == 'admin' or tenant == '' :
-        return True
-    return False
-#tenant end
 
 def _notify(updated_object, object_type, object_id):
     semaphore = '%s-id-%s' % (object_type, object_id)
@@ -214,27 +200,7 @@ def list(object_type):
         return http_response(201, '%s Created' % s_obj.capitalize(),
                              ref=href, **{s_obj: model_object})
     elif flask.request.method == 'GET':
-        #tenant start
-        #model_objects = api._model_get_all(object_type)
-        if object_type == 'nodes':
-            #target_tenant = 'test2-tenant'
-            target_tenant = request.headers.get('tenant') 
-
-            if is_adminTenant(target_tenant) :
-                model_objects = api._model_get_all(object_type)
-            else:
-                ##tenant(add attr) start
-                #query = 'attrs.tenant="%s" or attrs.tenant=null' % target_tenant
-                ##tenant(add attr) end
-
-                ##tenant(add to nodes db) start
-                ##query = 'tenant="%s" or tenant=null' % target_tenant
-                ##tenant(add to nodes db) end
-                #model_objects = api._model_query(object_type, query)
-                model_objects = get_node_reserved_tenant(target_tenant)
-        else:
-            model_objects = api._model_get_all(object_type)
-        #tenant end
+        model_objects = api._model_get_all(object_type)
         return http_response(200, 'success', **{object_type: model_objects})
     else:
         return http_notfound(msg='Unknown method %s' % flask.request.method)
@@ -482,59 +448,3 @@ def set_restore_list(plan, solution_plan, node_id):
     return  [1, [solution_plan_dict]]
 
 #add_backup
-
-# tenant-s 20140528
-def get_node_reserved_tenant(target_tenant):
-
-    api = api_from_models()
-
-    # get nodes other than servers and switches
-    query = '''attrs.tenant="%s" or attrs.tenant="any" or
-                (attrs.tenant=null and
-                    ("agent" ! in facts.backends))''' % target_tenant
-    model_objects = api._model_query('nodes', query)
-    log("model_objetcs = %s" %(model_objects))
-
-    # get servers and switches
-    query = 'attrs.tenant=null and ("agent" in facts.backends)'
-    model_obj_agent = api._model_query('nodes', query)
-
-    # get devide list that are assigned to the tenannt from the resouce managers
-    ori=ool_rm_if.ool_rm_if()
-        
-    cookie_data = request.headers.get('Cookie')
-    tokenId = ''
-    cookie_split=cookie_data.split(';')
-    for cookie in cookie_split:
-        index = cookie.find(TOKENKEYWORD)
-        if index != -1:
-            tokenId = cookie[index + len(TOKENKEYWORD):]
-            break
-
-    if 0 == len(tokenId):
-        logging.debug('facts_please.py:create() not find tokenID')
-        return model_objects
-
-    #logging.debug('TokenID=%s' % tokenId)
-    #logging.debug('tenant=%s' % flask.request.headers.get('tenant'))	
-    ori.set_auth(tokenId)
-    data = ori.get_tenant('', target_tenant)
-    #logging.debug('data = %s' % data)
-
-    # return err
-    if -1 == data[0]:
-        logging.debug("ori.get_tenant err data=%s" %(data))
-        return model_objects 
-
-    # set result
-    result = data[1]
-
-    # determine servers and switches to display
-    for obj in model_obj_agent:
-        for node in result:
-            if obj['name'] == node['device_name']:
-                model_objects.append(obj)
-                break
-
-    return model_objects
-# tenant-e 20140528

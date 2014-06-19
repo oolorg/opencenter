@@ -19,6 +19,50 @@
        "constraints":  [ "'nova-compute' in facts.backends" ],
        "consequences": []
     },
+    "backup_cluster": {
+        "args": {
+           "backup_name": {
+               "friendly": "Backup Folder Name",
+               "description": "The name of backup Folder.",
+               "default": "",
+               "placeholder": "XXX_TEST_ENV",
+               "type": "string",
+               "required": true
+            },
+           "auth": {
+               "friendly": "auth",
+               "description": "auth",
+               "default": "",
+               "placeholder": "auth",
+               "type": "string",
+               "required": false
+            }
+       },
+       "constraints":  [ "'chef-environment' in facts.backends" ],
+       "consequences": []
+    },
+    "restore_cluster": {
+        "args": {
+           "restore_name": {
+               "friendly": "Restor Folder Name",
+               "description": "The name of backup Folder.",
+               "default": "",
+               "placeholder": "XXX_TEST_ENV",
+               "type": "string",
+               "required": true
+            },
+           "auth": {
+               "friendly": "auth",
+               "description": "auth",
+               "default": "",
+               "placeholder": "auth",
+               "type": "string",
+               "required": false
+            }
+       },
+       "constraints":  [ "'chef-environment' in facts.backends" ],
+       "consequences": []
+    },
     "create_cluster": {
         "args": {
             "cluster_name": {
@@ -114,9 +158,73 @@
                "default": "kvm",
                "type": "string",
                "required": true
+            },
+           "tenant_name": {
+               "friendly": "tenant name",
+               "description": "tenant name",
+               "default": "",
+               "placeholder": "tenant name",
+               "type": "string",
+               "required": false
+            },
+            "network_provider": {
+               "friendly": "OpenStack Network Type(neutron)",
+               "description": "quantum or nova",
+               "default": "nova",
+               "type": "string",
+               "required": true
+            },
+            "neutron_plugin": {
+               "friendly": "Neutron Plugin(neutron)",
+               "description": "Neutron Plugin",
+               "default": "ovs",
+               "type": "string",
+               "required": true
+            },
+            "neutron_ovs_network_type": {
+               "friendly": "Neutron Network Type(neutron)",
+               "description": "gre or vlan",
+               "default": "gre",
+               "type": "string",
+               "required": true
+            },
+            "neutron_ofc_host": {
+               "friendly": "ofc host(neutron)",
+               "description": "open flow controller host ip address",
+               "default": "127.0.0.1",
+               "type": "string",
+               "required": true
+            },
+            "neutron_lbaas_enabled": {
+               "friendly": "LbaaS Enabled(neutron)",
+               "description": "use LbaaS Agent",
+               "default": "True",
+               "type": "string",
+               "required": true
+            },
+            "neutron_of_if": {
+               "friendly": "OpenFlow Interface(neutron)",
+               "description": "OpenFlow Network Interface for VM",
+               "default": "True",
+               "type": "string",
+               "required": true
             }
         },
         "constraints": [ "ifcount('chef-server') > 0" ],
         "consequences": []
+    },
+    "set_sdnbox": {
+        "args": {
+            "backend": {
+                "type": "string",
+                "required": true
+            },
+            "tokenid": {
+                "type": "string",
+                "required": true
+            }
+        },
+        "constraints": [],
+        "consequences": [ "facts.backends := union(facts.backends, 'sdn')" ]
     }
 }

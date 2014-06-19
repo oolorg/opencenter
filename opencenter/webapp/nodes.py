@@ -35,6 +35,8 @@ from opencenter.webapp import generic
 from opencenter.webapp import utility
 from opencenter.webapp.utility import unprovisioned_container
 
+from opencenter.backends.nova import ool_rm_if
+from flask import request
 
 object_type = 'nodes'
 bp = flask.Blueprint(object_type,  __name__)
@@ -238,3 +240,22 @@ def whoami():
         node = api._model_get_by_id('nodes', node['id'])
         log.info('Registration complete for %s' % node_id)
     return generic.http_response(200, 'success', **{'node': node})
+
+@bp.route('/ipaddress/<host_name>', methods=['GET'])
+def get_ipaddress(host_name):
+    log = logging.getLogger('.'.join((__name__, 'get_ipaddress')))
+    log.info('Request received.get_ipaddress')
+    try:
+        tokenId = request.cookies.get("iPlanetDirectoryPro")
+        ori = ool_rm_if.ool_rm_if()
+        ori.set_auth(tokenId)
+        nic_info = ori.get_nic_traffic_info(host_name, "C-Plane")
+        if -1 != nic_info[0]:
+            return generic.http_response(200, 'success', **{'host_name': host_name, 'ip_address':nic_info[1][0]['ip_address']})
+        else:
+            log.error('not found.')
+    except Exception as e:
+        log.error('[FATAL]: %s' % str(e))
+    log.info('Response complete.get_ipaddress')
+    return generic.http_badrequest(msg='error.')
+

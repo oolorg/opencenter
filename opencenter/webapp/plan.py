@@ -29,6 +29,14 @@ from opencenter.db.api import api_from_models
 from opencenter.webapp import generic
 # from opencenter.webapp import utility
 
+#add_isolation###################
+from flask import request
+import datetime
+import logging
+logger = logging.getLogger()
+#add_isolation###################
+
+
 bp = flask.Blueprint('plan', __name__)
 
 
@@ -56,8 +64,31 @@ def run_plan():
             for arg in step['args']:
                 if 'value' in step['args'][arg]:
                     step['ns'][arg] = step['args'][arg]['value']
-
+#add_isolation###################
+                #for add NovaCluster
+                if arg == "tenant_name":
+                    uid=request.headers.get('uid')
+                    tenant=request.headers.get('tenant')
+                    log("log  uid:%s  tenant:%s " %(uid,tenant))
+                    step['ns'][arg] = tenant
+                #for add Backup and Restore
+                if arg == "auth":
+                    cookie_data=request.headers.get('Cookie')
+                    log("log  cookie:%s " %(cookie_data))
+                    step['ns'][arg] = cookie_data
+#add_isolation###################
             step.pop('args')
+
 
     # now our plan is a standard plan.  Let's run it
     return generic.http_solver_request(data['node'], [], api=api, plan=plan)
+
+
+#add_isolation###################
+def log(log):
+    d = datetime.datetime.today()
+    tm= d.strftime("%m%d %H:%M:%S")
+
+    logger.debug('plan:%s :%s ' %(tm, log))
+    return 0
+#add_isolation###################
