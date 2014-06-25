@@ -199,6 +199,11 @@ class ChefClientBackend(opencenter.backends.Backend):
         returns (success_bool, failure_string)
         """
 
+        for node in nodelist:
+            nodeinfo = api.node_get_by_id(node)
+            if 'sdn' in nodeinfo['facts']['backends']:
+                nodelist.remove(node)
+
         if len(nodelist) == 0:
             return True, 'Nothing to converge'
 
