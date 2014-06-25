@@ -81,8 +81,17 @@ class ChefClientBackend(opencenter.backends.Backend):
                         node_attributes[fact] = fact_serialized
 
         # now generate the json from the facts
+        chefserver = api._model_get_first_by_query('nodes', '"chef-server" in facts.backends')
+        version = chefserver['facts']['chef_server_cookbook_version']
+        if version >= 'v4.2':
+            env_file = 'environment_havana.tmpl'
+        elif version >= 'v4.1':
+            env_file = 'environment_grizzly41.tmpl'
+        else:
+            env_file = 'environment.tmpl'
+
         environment_template = os.path.join(os.path.dirname(__file__),
-                                            'environment.tmpl')
+                                            env_file)
         node_template = os.path.join(os.path.dirname(__file__),
                                      'node.tmpl')
 
