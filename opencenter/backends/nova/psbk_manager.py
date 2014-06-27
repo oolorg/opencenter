@@ -25,10 +25,10 @@ IP_KEY='A_IP='
 UID_KEY='A_UID='
 UPW_KEY='A_UPW='
 
-
+#-------------------------------------------------------
 class psbk_manager:
 
-	def __init__(self, BK_Host, BK_Dir, ObjLog):
+	def __init__(self, Local_User, BK_Host, BK_Dir, ObjLog):
 		self.auth =""
 		self.a_device_name={}
 		self.a_model={}
@@ -42,6 +42,7 @@ class psbk_manager:
 
 		self.ori=ool_rm_if.ool_rm_if()
 
+		self.local_user= Local_User
 		self.bk_host= BK_Host
 		self.bk_dir = BK_Dir
 		self.logger = ObjLog
@@ -183,14 +184,19 @@ class psbk_manager:
 		try:
 			f=open(TMP_FILE, 'w')
 		except Exception, e:
-			self.__except_log__('pfs file error' + str(e))
+			self.__except_log__('pfs file error(backup)' + str(e))
 			return -1
 		else:
 			f.write(self.ps_list)
 		f.close()
 
-		psl=pslist_backup.pslist_backup(self.bk_uip, self.bk_uid, self.bk_upw)
-		psl.set_pslist(TMP_FILE, self.bk_dir)
+		psl=pslist_backup.pslist_backup(self.local_user, self.bk_uip, self.bk_uid, self.bk_upw)
+		psl.set_logger(self.logger)
+		ret = psl.set_pslist(TMP_FILE, self.bk_dir)
+		if 0 != ret:
+			self.__except_log__('pslist copy err')
+			print 'pslist copy err'
+			return -1
 
 		commands.getoutput('rm ' + TMP_FILE)
 
@@ -213,14 +219,19 @@ class psbk_manager:
 
 		TMP_FILE='/tmp/ps_' + tm
 
-		psl=pslist_backup.pslist_backup(self.bk_uip, self.bk_uid, self.bk_upw)
-		psl.get_pslist(TMP_FILE, self.bk_dir)
+		psl=pslist_backup.pslist_backup(self.local_user, self.bk_uip, self.bk_uid, self.bk_upw)
+		psl.set_logger(self.logger)
+		ret = psl.get_pslist(TMP_FILE, self.bk_dir)
+		if 0 != ret:
+			self.__except_log__('pslist copy err')
+			print 'pslist copy err'
+			return -1
 
 		pslist=''
 		try:
 			f=open(TMP_FILE, 'r')
 		except Exception, e:
-			self.__except_log__('pfs file error' + str(e))
+			self.__except_log__('psl file error(restore)' + str(e))
 			return -1
 		else:
 			for line in f:

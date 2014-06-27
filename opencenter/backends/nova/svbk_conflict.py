@@ -3,7 +3,8 @@ import fcntl
 import logging
 import os.path
 
-BASE_DIR_NAME="/usr/share/pyshared/testshell"
+BASE_DIR_NAME="/usr/share/pyshared/opencenter/backends/nova"
+#BASE_DIR_NAME="/usr/share/pyshared/testshell"
 CONFLICT_FILE='br_conflict.inf'
 MODE_BACKUP = "backup"
 MODE_RESTORE= "restore"
@@ -33,6 +34,12 @@ class svbk_conflict():
 			fd= open(file_path, "w")
 			fd.close()
 			os.chmod(file_path, 0666)
+
+	def del_file(self):
+		del_file_name='%s/%s' % (BASE_DIR_NAME, CONFLICT_FILE)
+		if os.path.exists(del_file_name):
+			os.remove(del_file_name)
+			self.logger.debug('SVBK_Conflict del file=%s' % del_file_name)
 
 	def chk_mode_state(self, br_mode, group_name, node_list):
 

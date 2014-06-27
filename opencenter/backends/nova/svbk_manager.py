@@ -11,6 +11,7 @@ import psbk_manager
 import traceback
 import json
 import svbk_conflict
+import svbk_utls
 
 # Physical Switch Backup/Restore Manager
 #disk size
@@ -48,7 +49,7 @@ DEBUG="OFF"
 
 B_STOP_FILENAME="/b_stop"
 R_STOP_FILENAME="/r_stop"
-ROOP_TIME_OUT=60
+LOOP_TIME_OUT=60
 
 MODE_BACKUP = "backup"
 MODE_RESTORE= "restore"
@@ -82,7 +83,8 @@ class svbk_manager:
         self.logObj=logObj
         self.limit_disk_size=LIMIT_DISK_SIZE_G
         self.interval_time=INTERVAL_TIME
-        self.loop_timeout_m=ROOP_TIME_OUT
+        self.loop_timeout_m=LOOP_TIME_OUT
+        self.opencenter_server_name=""
         self.storage_server_name=""
         self.logpath="/var/log/br/"
         self.logfile="ddd.log"
@@ -127,7 +129,6 @@ class svbk_manager:
 
         return 0
 
-
     def _ssh_copyid(self, exec_user,DEST_IP, DEST_USER, DEST_PW):
         ssh_newkey = 'Are you sure you want to continue connecting'
 
@@ -171,7 +172,6 @@ class svbk_manager:
         self.br_log(node_id, name, br_mode, 'shell ret =  : '+str(shell_ret))
 
         return shell_ret
-
 
     def shellcmd_exec_br_state(self, exec_user, br_mode, node_id, name, cmd):
         shell_ret=0
@@ -298,43 +298,6 @@ class svbk_manager:
         conflict.set_loger(self.logObj)
         ret = conflict.chk_mode_state(br_mode, cluster_name, node_list)
 
-        if 0 == ret:
-
-#        ##get nodeinf
-#        nodeinfo = api.node_get_by_id(node_id)
-#        if 'backup_state' in nodeinfo['facts']:
-#            if MODE_BACKUP in nodeinfo['facts']['backup_state']:
-#                if br_mode == "b":
-#                    #self.logger.debug('running backup then can not backup')
-#                    self.br_log(node_id, cluster_name, br_mode, '####1 running backup then already backup')
-#                    return 1
-#                if br_mode == "r":
-#                    self.br_log(node_id, cluster_name, br_mode, '####2 running backup then can not restore')
-#                    return -1
-#
-#            elif MODE_RESTORE in nodeinfo['facts']['backup_state']:
-#                if br_mode == "b":
-#                    self.br_log(node_id, cluster_name, br_mode, '####3 running restore then can not backup')
-#                    return -1
-#                if br_mode == "r":
-#                    self.br_log(node_id, cluster_name, br_mode, '####4 running restore then already restore')
-#                    return 1
-#
-#            else:
-#                self.br_log(node_id, cluster_name, br_mode, '####can backup :nothing set mode')
-#                #self.logger.debug('can backup :nothing set mode')
-#
-#        else:
-#                self.br_log(node_id, cluster_name, br_mode, 'can backup:nothing set in facts')
-#                #self.logger.debug('can backup:nothing set in facts ')
-
-            #backup state run
-            if br_mode == "b":
-                self.set_mode_state(api, node_id, MODE_BACKUP)
-
-            if br_mode == "r":
-                self.set_mode_state(api, node_id, MODE_RESTORE)
-
         return ret
 
     def set_mode_state(self, api, node_id, state):
@@ -346,17 +309,34 @@ class svbk_manager:
         conflict.set_loger(self.logObj)
         conflict.set_mode_state(group_name, state)
 
-        #backup state is none
-        api._model_create('facts', {'node_id': node_id,
-                            'key': 'backup_state',
-                            'value': state})
+    def set_parent_id(self, clster_name, node_id, br_mode, api, name, p_id):
 
-    def set_parent_id(self, api, node_id, p_id):
-        #backup state is none
-        api._model_create('facts', {'node_id': node_id,
-                            'key': 'parent_id',
-                            'value': p_id})
+        nodeinfo = api._model_get_first_by_query(
+            'nodes',
+            'name="%s"' % name)
 
+        if isinstance(nodeinfo,type(None)):
+            self.br_log(node_id, clster_name, br_mode, 'node is none:name=%s err' %(name))
+            return
+
+        #p_id = 2
+
+        get_node_id = int(nodeinfo['id'])
+        self.br_log(node_id, clster_name, br_mode, 'get_node_id=%s set parent_id=%s' %(get_node_id,p_id))
+
+        api._model_create('facts', {'node_id': get_node_id,
+                      'key': 'parent_id',
+                      'value': p_id})
+
+        nodes = api._model_query(
+            'nodes',
+            'name="%s"' % name)
+
+        #if nodes is any
+        if len(nodes) != 1:
+            self.br_log(node_id, clster_name, br_mode, 'len(nodes)=%s err ' %(len(nodes)))
+
+        return
 
     def get_node_info(self, api, node_id, name, br_mode):
         #get all node id
@@ -456,11 +436,22 @@ class svbk_manager:
 
         return retdata
 
+    def get_user_name(self, host_name):
+        ori=ool_rm_if.ool_rm_if()
+        ori.set_auth(self.token)
+        data = ori.get_device(host_name)
+
+        if -1 != data[0]:
+            data1={}
+            data1=data[1]
+            return [0, data1['user_name']]
+        else:
+            return [-1,'NG']
+
     def set_server_info(self, node_id, server_info_list,server_name, name, br_mode):
 
         #make Resource Manager Instance
         temp_server_info=server_info_list
-
 
         ori=ool_rm_if.ool_rm_if()
         ori.set_auth(self.token)
@@ -570,12 +561,14 @@ class svbk_manager:
 
         self.limit_disk_size = int(conf.get('options', 'limit_disk_size'))
         self.interval_time = int(conf.get('options', 'interval_time'))
+        self.opencenter_server_name=conf.get('options','opencenter_server_name')
         self.storage_server_name = conf.get('options', 'storage_server_name')
         self.loop_timeout_m = int(conf.get('options', 'loop_timeout_m'))
         #self.rm_pw = conf.get('options', 'rm_pw')
 
         self.br_log(node_id, clster_name, br_mode, '####read_file limit_disk_size :%s' %(self.limit_disk_size) )
         self.br_log(node_id, clster_name, br_mode, '####read_file interval_time :%s' %(self.interval_time) )
+        self.br_log(node_id, clster_name, br_mode, '####read_file opencenter_server_name :%s' %(self.opencenter_server_name) )
         self.br_log(node_id, clster_name, br_mode, '####read_file storage_server_name :%s' %(self.storage_server_name) )
         self.br_log(node_id, clster_name, br_mode, '####read_file loop_timeout_m :%s' %(self.loop_timeout_m) )
         #self.br_log(node_id, clster_name, br_mode, '####read_file rm_pw :%s' %(self.rm_pw) )
@@ -583,7 +576,7 @@ class svbk_manager:
         return OK
 
     def make_nodeinfo_file(self, clster_name, node_id, br_mode, backup_node_data_info):
-        
+
         #define node list
         server_node_name   = backup_node_data_info[SV_NAME]
         switch_node_name   = backup_node_data_info[SW_NAME]
@@ -592,8 +585,6 @@ class svbk_manager:
         server_backends    = backup_node_data_info[SV_BACKENDS]
         server_node_id     = backup_node_data_info[SV_NODE]
         switch_node_id     = backup_node_data_info[SW_NODE]
-
-
 
         #check server
         if len(server_node_name) != len(server_p_node_list):
@@ -627,7 +618,6 @@ class svbk_manager:
                   BACKUP_DATA_KEY_N_ID: str(switch_node_id[i]),
                   BACKUP_DATA_KEY_P_ID: str(switch_p_node_list[i])}
             jdata[BACKUP_DATA_SW].append(tmp)
-
 
         #file name make
         d = datetime.datetime.today()
@@ -671,7 +661,6 @@ class svbk_manager:
         #server & switch 
         db_node_list = db_server_list + db_switch_list
 
-
         #folder_name
         #d = datetime.datetime.today()
         #db_folder_name= "t_" + str(d.strftime("%Y-%m-%d %H:%M:%S  "))  + folder_name
@@ -679,14 +668,12 @@ class svbk_manager:
 
         #db_folder_name= "test1_"  + folder_name
 
-
         self.br_log(node_id, clster_name, br_mode, '#### set_backup_data :  db_clster_name = %s' %(db_clster_name))
         self.br_log(node_id, clster_name, br_mode, '#### set_backup_data :  db_folder_name = %s' %(db_folder_name))
         self.br_log(node_id, clster_name, br_mode, '#### set_backup_data :  db_node_list = %s'   %(db_node_list))
 
         #set db
         data=ori.set_backup_data(db_clster_name, db_folder_name, db_node_list)
-
 
         if -1 == data[0]:
             self.br_log(node_id, clster_name, br_mode, '#### set_backup_data err  data=%s' %(data))
@@ -696,14 +683,12 @@ class svbk_manager:
 
     def getdb_backup_alldata(self, clster_name, node_id, br_mode, api):
 
-
         #get cluster name
         node = api.node_get_by_id(node_id)
         clster_name = node['name']
 
         #make regist db cluster name 
         db_clster_name=  str(clster_name + "_ID%s" %(node_id))
-
 
         ori=ool_rm_if.ool_rm_if()
         ori.set_auth(self.token)
@@ -734,7 +719,6 @@ class svbk_manager:
 
         #self.br_log(node_id, clster_name, br_mode, 'getdb_backup_alldata: data[1] %s'%(data[1]))
 
-
         backupAllData  = data[1]
 
         for i in range(len(backupAllData)):
@@ -746,14 +730,12 @@ class svbk_manager:
 
         return [0, allnode]
 
-
-    def set_parent_id_all(self, clster_name, node_id, br_mode, api, node_id_list, parent_id_list):
+    def set_parent_id_all(self, clster_name, node_id, br_mode, api, node_name_list, parent_id_list):
 
         self.br_log(node_id, clster_name, br_mode, '#### set_parent_id_all')
 
-
-        for i in range(len(node_id_list)):
-            self.set_parent_id(api, int(node_id_list[i]), int(parent_id_list[i]))
+        for i in range(len(node_name_list)):
+            self.set_parent_id(clster_name, node_id, br_mode, api, node_name_list[i] , int(parent_id_list[i]))
 
         return
 
@@ -817,7 +799,6 @@ class svbk_manager:
     def backup_cluster(self, api, node_id, **kwargs):
 
         try:
-
             br_mode="b"
             CLSTER_NAME = self.get_node_name(api, node_id)
 
@@ -834,7 +815,6 @@ class svbk_manager:
 
             self.make_log_file_name(CLSTER_NAME,node_id,br_mode,**kwargs)
 
-
             ###################
             #check mode
             ###################
@@ -847,7 +827,6 @@ class svbk_manager:
                 return [NG, msg]
 
             self.br_log(node_id, CLSTER_NAME, br_mode, '#### Mode check OK ')
-
 
             ###############
             ####Backup ####
@@ -872,7 +851,6 @@ class svbk_manager:
 
             raise
 
-
     #####################
     #Backup Module
     #####################
@@ -885,8 +863,6 @@ class svbk_manager:
         br_mode="b"
         CLSTER_NAME = self.get_node_name(api, node_id)
 
-
-
         self.br_log(node_id, CLSTER_NAME, br_mode, '#### Backup Start ')
 
         if not 'backup_name' in kwargs:
@@ -894,9 +870,7 @@ class svbk_manager:
 
         BACKUP_FOLDER_RNAME=CLSTER_NAME + "_ID%s" %(node_id)  +"/" +self.folder_date_str + kwargs['backup_name'] 
 
-
         self.b_log(node_id, CLSTER_NAME, 'backup_folder_name: %s' % BACKUP_FOLDER_RNAME)
-
 
         ret=self.set_system_param(CLSTER_NAME,node_id,br_mode)
         if ret!=0:
@@ -905,10 +879,8 @@ class svbk_manager:
             msg='#### set_system_param err'
             return [NG, msg]
 
-
         #self.b_log(node_id, CLSTER_NAME, 'DDDDDDDD: limit_disk_size=%s, ret:%s' %(self.limit_disk_size, ret))
         #return [OK, 'ok']
-
 
         #####################
         #B define
@@ -918,7 +890,6 @@ class svbk_manager:
 
         #SERVER_INFO_FILE_NAME="serv_info"
         #SERVER_LIST_FILE=SAVE_DIR_NAME+"/"+SERVER_INFO_FILE_NAME
-
 
         NODE_INFO_FILE_NAME="node_info"
         NODE_LIST_FILE=BASE_DIR_NAME+"/"+ BACKUP_FOLDER_RNAME + "/" + NODE_INFO_FILE_NAME
@@ -952,7 +923,6 @@ class svbk_manager:
         #server,switch node info
         backup_node_data_info = ret_info;
 
-
         self.br_log(node_id, CLSTER_NAME, br_mode, '*** SERVER_NODE_LIST :List %s, cnt=%s' %(server_node_name,server_num))
         self.br_log(node_id, CLSTER_NAME, br_mode, '*** SWITCH_NODE_LIST :List %s, cnt=%s' %(switch_node_name,switch_num))
 
@@ -960,7 +930,6 @@ class svbk_manager:
             #self.logger.debug('sever num = 0 then not backup')
             self.br_log(node_id, CLSTER_NAME, br_mode, '#### sever, switch num is 0 then "no action"')
             return [OK, 'ok']
-
 
         ######################
         #B Make Server info list
@@ -998,7 +967,6 @@ class svbk_manager:
             if 0 != retdata[0]:
                 #self.logger.debug('Set Server info set server_node_name=%s' %(server_node_name[i-1]))
                 self.b_log(node_id, CLSTER_NAME, '#### Set Server info  server_node_name=%s' %(server_node_name[i-1] ) )
-
                 msg='Set Server info set server_node_name=%s' %(server_node_name[i-1])
                 return [NG, msg]
 
@@ -1006,8 +974,14 @@ class svbk_manager:
         #B Set Exec_User
         ################
         self.br_log(node_id, CLSTER_NAME, br_mode, '#### Set Exec_User')
-        EXEC_USER=server_info[STORAGE_SV][USER_INDEX]
-
+#        EXEC_USER=server_info[STORAGE_SV][USER_INDEX]
+        ret = self.get_user_name(self.opencenter_server_name)
+        if 0 == ret[0]:
+            EXEC_USER=ret[1]
+        else:
+            self.b_log(node_id, CLSTER_NAME, '#### Set Exec_User error' )
+            msg='Set Exec_User error'
+            return [NG, msg]
 
         #####################################
         #B Set NovaClaster Server Make Exec Env
@@ -1036,7 +1010,6 @@ class svbk_manager:
             msg='Check Directory (already same name dirctory)'
             return [NG, msg]
 
-
         #################################
         #B Check Strorage Server Disk Size
         ################################
@@ -1059,9 +1032,7 @@ class svbk_manager:
             msg='#### Check Strorage Server Disk Size Shortage  Err limit_disk_size=%s > diskSize_G=%s ' %( self.limit_disk_size, diskSize_G )
             return [NG, msg]
 
-
         self.b_log(node_id, CLSTER_NAME, '#### Check Strorage SV Disk Size LIMIT(G)=%s diskSize(G)=%s ' %( self.limit_disk_size, diskSize_G ) )
-
 
         #########################################
         #B Make Backup directory to Storage Server
@@ -1077,7 +1048,6 @@ class svbk_manager:
             self.br_log(node_id, CLSTER_NAME, br_mode, '#### make dir err ')
             msg='make dir err'
             return [NG, msg]
-
 
         #######################
         #B Make Directory Check 
@@ -1106,7 +1076,7 @@ class svbk_manager:
 
             #psbk=psbk_manager.psbk_manager(STORAGE_SERVER_NAME, SAVE_DIR_NAME_SWITCH)
             #psbk=psbk_manager.psbk_manager(self.storage_server_name, SAVE_DIR_NAME_SWITCH)
-            psbk=psbk_manager.psbk_manager(self.storage_server_name, SAVE_DIR_NAME_SWITCH,self.logObj)
+            psbk=psbk_manager.psbk_manager(EXEC_USER, self.storage_server_name, SAVE_DIR_NAME_SWITCH,self.logObj)
 
             self.br_log(node_id, CLSTER_NAME, br_mode, '####SWITCH  Call psbk.set_PS_list')
 
@@ -1131,7 +1101,6 @@ class svbk_manager:
 
             self.br_log(node_id, CLSTER_NAME, br_mode, '####SWITCH  Run Switch backup End')
 
-
         #DDD
         if DEBUG == "ON":
             server_num=0
@@ -1140,7 +1109,6 @@ class svbk_manager:
             self.br_log(node_id, CLSTER_NAME, br_mode, '#### Server node is 0 then "no action"')
             #return self._ok()
             return [OK, 'ok']
-
 
         #########################################################################
         ret = self.br_log(node_id, CLSTER_NAME, br_mode, '#### Server Back UP Start')
@@ -1152,7 +1120,15 @@ class svbk_manager:
 
         #ssh root@\${SV$i[0]} /boot/br_agent \${SV$i[1]} \${SV$i[2]} \$mode \$SAVE_DIR_NAME
         for i in range(START_INDEX, server_cnt):
-            cmd='ssh root@%s  /boot/br_agent  %s  %s  b %s' %(server_info[i][IP_INDEX],  server_info[i][USER_INDEX], server_info[i][PW_INDEX], SAVE_DIR_NAME)
+            # update_br_agent
+            svbkutl=svbk_utls.svbk_utls()
+            ret =svbkutl.update_br_agent(server_info[i][USER_INDEX], server_info[i][IP_INDEX])
+            if NG == ret[0]:
+                self.br_log(node_id, CLSTER_NAME, br_mode, '#### update_br_agent backup err ')
+                msg='update_br_agent backup err'
+                return [NG, msg]
+
+            cmd='ssh root@%s /boot/%s %s %s b %s' %(server_info[i][IP_INDEX], svbkutl.get_br_agent_name(), server_info[i][USER_INDEX], server_info[i][PW_INDEX], SAVE_DIR_NAME)
             #ret = self.shellcmd_exec(EXEC_USER,cmd)
             ret = self.shellcmd_exec(EXEC_USER,br_mode, node_id, CLSTER_NAME, cmd)
             if ret!=0:
@@ -1161,7 +1137,6 @@ class svbk_manager:
                 #return self._fail(msg='make run backup err')
                 msg='make run backup err'
                 return [NG, msg]
-
 
         ################
         #B Start status check
@@ -1181,13 +1156,12 @@ class svbk_manager:
 
             timedf_int = int(timedf)
             HH= timedf_int / 3600
-            SS= timedf_int % 3600
-            MM= timedf_int / 60
+            #SS= timedf_int % 3600
+            MM= (timedf_int % 3600)/60
             SS= timedf_int % 60
 
             #logout
-            self.br_log(node_id, CLSTER_NAME, br_mode, "#### Roop  status check Total Time: %s:%s:%s (h:m:s)" %(HH,MM,SS) )
-
+            self.br_log(node_id, CLSTER_NAME, br_mode, "#### Loop  status Check Total Time: %s:%s:%s (h:m:s)" %(HH,MM,SS) )
 
             for i in range(START_INDEX, server_cnt):
 
@@ -1199,7 +1173,7 @@ class svbk_manager:
                 #tmp_ret=$?
                 #ret=`expr $tmp_ret + $ret`
                 #cmd='ssh root@%s grep -wq %s %s/status_b_*_%s 2> /dev/null ' %(server_info[STORAGE_SV][IP_INDEX], B_END_STATUS, SAVE_DIR_NAME, server_info[i][IP_INDEX])
-                cmd='ssh root@%s grep -wq %s %s/status_b_%s_* 2> /dev/null ' %(server_info[STORAGE_SV][IP_INDEX], B_END_STATUS, SAVE_DIR_NAME, server_info[i][NAME_INDEX])
+                cmd='ssh root@%s grep -wq %s %s/status_b_%s 2> /dev/null ' %(server_info[STORAGE_SV][IP_INDEX], B_END_STATUS, SAVE_DIR_NAME, server_info[i][NAME_INDEX])
 
                 ret = self.shellcmd_exec(EXEC_USER,br_mode, node_id, CLSTER_NAME, cmd)
                 #self.logger.debug('server_info[%s] IP=%s SV_NAME=%s ret=%s' %(i, server_info[i][IP_INDEX], server_info[i][NAME_INDEX], ret) )
@@ -1209,21 +1183,19 @@ class svbk_manager:
 
                 #cmd='ssh root@192.168.1.104 grep -wq backup_ok /backup/1217_1612/server/status_b_*_192.168.1.192'
 
-
                 ################
                 #B status view
                 ################
                 #cmd='ssh root@%s tail -n 1 %s/status_b_*_%s  2> /dev/null ' %(server_info[STORAGE_SV][IP_INDEX], SAVE_DIR_NAME, server_info[i][IP_INDEX])
-                cmd='ssh root@%s tail -n 1 %s/status_b_%s_*  2> /dev/null ' %(server_info[STORAGE_SV][IP_INDEX], SAVE_DIR_NAME, server_info[i][NAME_INDEX])
+                cmd='ssh root@%s tail -n 1 %s/status_b_%s 2> /dev/null ' %(server_info[STORAGE_SV][IP_INDEX], SAVE_DIR_NAME, server_info[i][NAME_INDEX])
 
                 ret = self.shellcmd_exec_br_state(EXEC_USER,br_mode, node_id, CLSTER_NAME, cmd)
-
 
                 ################
                 #B status ng check
                 ################
                 #cmd='ssh root@%s grep -wq %s %s/status_b_*_%s 2> /dev/null ' %(server_info[STORAGE_SV][IP_INDEX], B_NG_STATUS, SAVE_DIR_NAME, server_info[i][IP_INDEX])
-                cmd='ssh root@%s grep -wq %s %s/status_b_%s_* 2> /dev/null ' %(server_info[STORAGE_SV][IP_INDEX], B_NG_STATUS, SAVE_DIR_NAME, server_info[i][NAME_INDEX])
+                cmd='ssh root@%s grep -wq %s %s/status_b_%s 2> /dev/null ' %(server_info[STORAGE_SV][IP_INDEX], B_NG_STATUS, SAVE_DIR_NAME, server_info[i][NAME_INDEX])
 
                 ret = self.shellcmd_exec(EXEC_USER,br_mode, node_id, CLSTER_NAME, cmd)
                 if ret==0:
@@ -1231,7 +1203,6 @@ class svbk_manager:
                     #return self._fail(msg='Status loop check [backup_ng] IP:%s NAME:%s' %(server_info[i][IP_INDEX], server_info[i][NAME_INDEX]) )
                     msg='Status loop check [backup_ng] IP:%s NAME:%s' %(server_info[i][IP_INDEX], server_info[i][NAME_INDEX])
                     return [NG, msg]
-
 
                 #STATUS=`ssh root@${STORAGE_SV[0]} tail -n 1 "$SAVE_DIR_NAME/status_b_*_${SV1[0]}"  2> /dev/null`
 
@@ -1250,9 +1221,9 @@ class svbk_manager:
                 break
 
             #time-out
-            if MM > self.loop_timeout_m :
-                self.br_log(node_id, CLSTER_NAME, br_mode, '#### MM is %s min Over stop' %(self.loop_timeout_m))
-                msg='#### MM is %s min Over stop '
+            if HH >= self.loop_timeout_m :
+                self.br_log(node_id, CLSTER_NAME, br_mode, '#### HH is %s hour Over stop' %(self.loop_timeout_m))
+                msg='#### HH is %s hour Over stop ' %(self.loop_timeout_m)
                 return [NG, msg]
                 break
 
@@ -1293,7 +1264,6 @@ class svbk_manager:
         self.br_log(node_id, CLSTER_NAME, br_mode, '#### Complete Success')
 
         return [OK, 'ok'] #END
-
 
     def restore_cluster(self, api, node_id, **kwargs):
 
@@ -1345,10 +1315,7 @@ class svbk_manager:
 
             #set mode none
             self.set_mode_state(api, node_id, MODE_NONE)
-
             raise
-
-
 
     #####################
     #Restore Module
@@ -1362,7 +1329,6 @@ class svbk_manager:
         br_mode="r"
         CLSTER_NAME = self.get_node_name(api, node_id)
 
-
         self.br_log(node_id, CLSTER_NAME, br_mode, '#### Restore Start ')
 
         #self.b_log(node_id, CLSTER_NAME, 'backup_cluster start ')
@@ -1375,9 +1341,7 @@ class svbk_manager:
 
         BACKUP_FOLDER_RNAME=CLSTER_NAME + "_ID%s" %(node_id) +"/" + restore_folder_name 
 
-
         self.br_log(node_id, CLSTER_NAME, br_mode, 'backup_name: %s' % BACKUP_FOLDER_RNAME)
-
 
         #self.logger.debug('NOVA_CLUSTER_NAME=%s' %(CLSTER_NAME))
 
@@ -1387,7 +1351,6 @@ class svbk_manager:
             self.br_log(node_id, CLSTER_NAME, br_mode, '#### set_system_param err'  )
             msg='#### set_system_param err'
             return [NG, msg]
-
 
         #####################
         #R define
@@ -1413,7 +1376,6 @@ class svbk_manager:
 
         #start time get
         time1 = time.time()
-
 
         ######################
         #R Make Server info list
@@ -1444,8 +1406,14 @@ class svbk_manager:
         #R Set Exec_User
         ################
         self.br_log(node_id, CLSTER_NAME, br_mode, '#### Set Exec_User')
-        EXEC_USER=server_info[STORAGE_SV][USER_INDEX]
-
+#        EXEC_USER=server_info[STORAGE_SV][USER_INDEX]
+        ret = self.get_user_name(self.opencenter_server_name)
+        if 0 == ret[0]:
+            EXEC_USER=ret[1]
+        else:
+            self.b_log(node_id, CLSTER_NAME, '#### Set Exec_User error' )
+            msg='Set Exec_User error'
+            return [NG, msg]
 
         #####################################
         #R Set Storage Server info
@@ -1476,7 +1444,6 @@ class svbk_manager:
             msg='R node_info trans err'
             return [NG, msg]
 
-
         f=open(file_path, 'r')
         backup_node_info = json.load(f)
         f.close()
@@ -1485,7 +1452,6 @@ class svbk_manager:
         commands.getoutput(cmd)
 
         self.br_log(node_id, CLSTER_NAME, br_mode, '#### R Get backup ServerInfo :%s' %(backup_node_info))
-
 
         ########################
         #R Get server name for opencenterDB
@@ -1510,7 +1476,6 @@ class svbk_manager:
         switch_num=len(switch_node_name)
         switch_node_name_char=','.join(switch_node_name)
 
-
         if (0 == server_num) and ( 0 == switch_num):
             #self.logger.debug('sever num = 0 then not backup')
             self.br_log(node_id, CLSTER_NAME, br_mode, '#### sever, switch num is 0 then "no action"')
@@ -1528,8 +1493,6 @@ class svbk_manager:
             self.br_log(node_id, CLSTER_NAME, br_mode, '#R Check Cluster node  check ng')
             msg='R Check Cluster node  check ng'
             return [NG, msg]
-
-
 
         ########################
         #R Set NovaClaster Server info
@@ -1549,7 +1512,6 @@ class svbk_manager:
                 msg='Set Server info set server_node_name=%s' %(server_node_name[i-1])
                 return [NG, msg]
 
-
         #####################################
         #R Set NovaClaster Server Make Exec Env
         #####################################
@@ -1566,8 +1528,6 @@ class svbk_manager:
                 #return self._fail(msg='make_exec err')
                 msg='make_exec err'
                 return [NG, msg]
-
-
 
         #######################
         #R Check Directory
@@ -1592,6 +1552,7 @@ class svbk_manager:
 
         node_id_list = server_node_id + switch_node_id
         parent_id_list = server_p_node_list + switch_p_node_list
+        node_name_list = server_node_name   + switch_node_name
 
         #DDD debug DDD
         #switch_num=0
@@ -1607,7 +1568,7 @@ class svbk_manager:
 
             #psbk=psbk_manager.psbk_manager(STORAGE_SERVER_NAME, SAVE_DIR_NAME_SWITCH)
             #psbk=psbk_manager.psbk_manager(self.storage_server_name, SAVE_DIR_NAME_SWITCH)
-            psbk=psbk_manager.psbk_manager(self.storage_server_name, SAVE_DIR_NAME_SWITCH,self.logObj)
+            psbk=psbk_manager.psbk_manager(EXEC_USER, self.storage_server_name, SAVE_DIR_NAME_SWITCH,self.logObj)
 
             self.br_log(node_id, CLSTER_NAME, br_mode, '#### SWITCH Call psbk.set_PS_list')
 
@@ -1621,7 +1582,6 @@ class svbk_manager:
                 msg='#### SWITCH psbk.set_PS_list Err psbk.set_PS_list Err)'
                 return [NG, msg]
 
-
             psbk.set_auth(self.token)
             self.br_log(node_id, CLSTER_NAME, br_mode, '####SWITCH  Call psbk.exec_restore()')
             ret=psbk.exec_restore()
@@ -1631,25 +1591,22 @@ class svbk_manager:
                 msg='####SWITCH  psbk.exec_restore() '
                 return [NG, msg]
 
-
             self.br_log(node_id, CLSTER_NAME, br_mode, '####SWITCH  Run Switch restore End')
 
         #DDD
         if DEBUG == "ON":
             server_num = 0
 
-
         if server_num == 0:
             self.br_log(node_id, CLSTER_NAME, br_mode, '#### Server node is 0 then "no action"')
             #return self._ok()
             return [OK, 'ok']
 
-
         #######################
         #R Dell Restore Status File
         #######################
         #ssh root@${STORAGE_SV[0]} rm -rf "$SAVE_DIR_NAME/status_${mode}_*"  2> /dev/null
-        cmd='ssh root@%s rm -rf %s/status_r_*  2> /dev/null' %(server_info[STORAGE_SV][IP_INDEX],  SAVE_DIR_NAME,)
+        cmd='ssh root@%s rm -rf %s/status_r_*  2> /dev/null' %(server_info[STORAGE_SV][IP_INDEX],  SAVE_DIR_NAME)
         ret = self.shellcmd_exec(EXEC_USER,br_mode, node_id, CLSTER_NAME, cmd)
         if ret!=0:
             self.br_log(node_id, CLSTER_NAME, br_mode, '#### Dell Restore Status File Err ')
@@ -1665,16 +1622,23 @@ class svbk_manager:
 
         #ssh root@\${SV$i[0]} /boot/br_agent \${SV$i[1]} \${SV$i[2]} \$mode \$SAVE_DIR_NAME
         for i in range(START_INDEX, server_cnt):
-            cmd='ssh root@%s  /boot/br_agent  %s  %s  r %s' %(server_info[i][IP_INDEX],  server_info[i][USER_INDEX], server_info[i][PW_INDEX], SAVE_DIR_NAME)
+            # update_br_agent
+            svbkutl=svbk_utls.svbk_utls()
+            ret = svbkutl.update_br_agent(server_info[i][USER_INDEX], server_info[i][IP_INDEX])
+            if NG == ret[0]:
+                self.br_log(node_id, CLSTER_NAME, br_mode, '#### update_br_agent restore err ')
+                msg='update_br_agent restore err'
+                return [NG, msg]
+
+            cmd='ssh root@%s /boot/%s %s %s r %s' %(server_info[i][IP_INDEX], svbkutl.get_br_agent_name(), server_info[i][USER_INDEX], server_info[i][PW_INDEX], SAVE_DIR_NAME)
             #ret = self.shellcmd_exec(EXEC_USER,cmd)
             ret = self.shellcmd_exec(EXEC_USER,br_mode, node_id, CLSTER_NAME, cmd)
             if ret!=0:
                 #self.logger.debug('make run backup err '  )
-                self.br_log(node_id, CLSTER_NAME, br_mode, '#### make run backup err ')
-                #return self._fail(msg='make run backup err')
+                self.br_log(node_id, CLSTER_NAME, br_mode, '#### make run restore err ')
+                #return self._fail(msg='make run restore err')
                 msg='make run backup err'
                 return [NG, msg]
-
 
         ################
         #R Start status check
@@ -1694,58 +1658,42 @@ class svbk_manager:
 
             timedf_int = int(timedf)
             HH= timedf_int / 3600
-            SS= timedf_int % 3600
-            MM= timedf_int / 60
+            #SS= timedf_int % 3600
+            MM= (timedf_int % 3600)/60
             SS= timedf_int % 60
 
             #logout
-            self.br_log(node_id, CLSTER_NAME, br_mode, "#### Roop  status check Total Time: %s:%s:%s (h:m:s)" %(HH,MM,SS) )
-
+            self.br_log(node_id, CLSTER_NAME, br_mode, "#### Loop  status Check Total Time: %s:%s:%s (h:m:s)" %(HH,MM,SS) )
 
             for i in range(START_INDEX, server_cnt):
 
                 ################
                 #R status loop check
                 ################
-
-                #eval ssh root@\${STORAGE_SV[0]} grep -wq \${B_STATUS[2]} "\${SAVE_DIR_NAME}/status_b_*_\${SV$i[0]}" 2> /dev/null
-                #tmp_ret=$?
-                #ret=`expr $tmp_ret + $ret`
-                #cmd='ssh root@%s grep -wq %s %s/status_r_*_%s 2> /dev/null ' %(server_info[STORAGE_SV][IP_INDEX], R_END_STATUS, SAVE_DIR_NAME, server_info[i][IP_INDEX])
-                cmd='ssh root@%s grep -wq %s %s/status_r_%s_* 2> /dev/null ' %(server_info[STORAGE_SV][IP_INDEX], R_END_STATUS, SAVE_DIR_NAME, server_info[i][NAME_INDEX])
+                cmd='ssh root@%s grep -wq %s %s/status_r_%s 2> /dev/null ' %(server_info[STORAGE_SV][IP_INDEX], R_END_STATUS, SAVE_DIR_NAME, server_info[i][NAME_INDEX])
 
                 ret = self.shellcmd_exec(EXEC_USER,br_mode, node_id, CLSTER_NAME, cmd)
-                #self.logger.debug('server_info[%s] IP=%s SV_NAME=%s ret=%s' %(i, server_info[i][IP_INDEX], server_info[i][NAME_INDEX], ret) )
                 self.br_log(node_id, CLSTER_NAME, br_mode, 'server_info[%s] IP=%s SV_NAME=%s ' %(i, server_info[i][IP_INDEX], server_info[i][NAME_INDEX]) )
 
                 all_ret = ret + all_ret
 
-                #cmd='ssh root@192.168.1.104 grep -wq backup_ok /backup/1217_1612/server/status_b_*_192.168.1.192'
-
-
                 ################
                 #R status view
                 ################
-                #cmd='ssh root@%s tail -n 1 %s/status_r_*_%s  2> /dev/null ' %(server_info[STORAGE_SV][IP_INDEX], SAVE_DIR_NAME, server_info[i][IP_INDEX])
-                cmd='ssh root@%s tail -n 1 %s/status_r_%s_*  2> /dev/null ' %(server_info[STORAGE_SV][IP_INDEX], SAVE_DIR_NAME, server_info[i][NAME_INDEX])
+                cmd='ssh root@%s tail -n 1 %s/status_r_%s 2> /dev/null ' %(server_info[STORAGE_SV][IP_INDEX], SAVE_DIR_NAME, server_info[i][NAME_INDEX])
 
                 ret = self.shellcmd_exec_br_state(EXEC_USER,br_mode, node_id, CLSTER_NAME, cmd)
-
 
                 ################
                 #R status ng check
                 ################
-                #cmd='ssh root@%s grep -wq %s %s/status_r_*_%s 2> /dev/null ' %(server_info[STORAGE_SV][IP_INDEX], R_NG_STATUS, SAVE_DIR_NAME, server_info[i][IP_INDEX])
-                cmd='ssh root@%s grep -wq %s %s/status_r_%s_* 2> /dev/null ' %(server_info[STORAGE_SV][IP_INDEX], R_NG_STATUS, SAVE_DIR_NAME, server_info[i][NAME_INDEX])
+                cmd='ssh root@%s grep -wq %s %s/status_r_%s 2> /dev/null ' %(server_info[STORAGE_SV][IP_INDEX], R_NG_STATUS, SAVE_DIR_NAME, server_info[i][NAME_INDEX])
 
                 ret = self.shellcmd_exec(EXEC_USER,br_mode, node_id, CLSTER_NAME, cmd)
                 if ret==0:
                     self.br_log(node_id, CLSTER_NAME, br_mode, '#### Status loop check [backup_ng] Err IP:%s NAME:%s' %(server_info[i][IP_INDEX], server_info[i][NAME_INDEX]) )
-                    #return self._fail(msg='Status loop check [backup_ng] IP:%s NAME:%s' %(server_info[i][IP_INDEX], server_info[i][NAME_INDEX]) )
                     msg='Status loop check [backup_ng] IP:%s NAME:%s' %(server_info[i][IP_INDEX], server_info[i][NAME_INDEX])
                     return [NG, msg]
-
-
 
                 time.sleep(self.interval_time )
 
@@ -1756,22 +1704,22 @@ class svbk_manager:
             if os.path.exists(FILEDIR+R_STOP_FILENAME) :
                 self.br_log(node_id, CLSTER_NAME, br_mode, '#### force stop')
                 os.remove(FILEDIR+R_STOP_FILENAME)
-                break
+                msg='#### force stop '
+                return [NG, msg]
 
             #time-out
-            if MM > self.loop_timeout_m :
-                self.br_log(node_id, CLSTER_NAME, br_mode, '#### MM is %s min Over stop' %(self.loop_timeout_m))
-                break
-
+            if HH >= self.loop_timeout_m :
+                self.br_log(node_id, CLSTER_NAME, br_mode, '#### HH is %s hour Over stop' %(self.loop_timeout_m))
+                msg='#### HH is %s hour Over stop ' %(self.loop_timeout_m)
+                return [NG, msg]
 
         ########################
         #R Set_Parent_id
         ########################
-        self.set_parent_id_all( CLSTER_NAME, node_id, br_mode, api, node_id_list, parent_id_list)
+        #self.set_parent_id_all( CLSTER_NAME, node_id, br_mode, api, node_id_list, parent_id_list)
+        self.set_parent_id_all( CLSTER_NAME, node_id, br_mode, api,node_name_list , parent_id_list)
 
         self.br_log(node_id, CLSTER_NAME, br_mode, '#### Complete Success')
 
-
         return [OK, 'ok']
-
 
