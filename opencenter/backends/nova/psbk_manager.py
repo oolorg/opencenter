@@ -6,6 +6,7 @@ import centec_if
 import datetime
 import pslist_backup
 import commands
+import os
 
 # Physical Switch Backup/Restore Manager
 TST_FLAG='OFF'
@@ -16,7 +17,7 @@ EXCEPT_TITLE='PSBK_MANAGER:%s'
 AUTH_KEY='xxx'
 
 BACKDIR="/backup/"
-PY_PATH='/home/openstack/opencenter/backend/nova/'
+PY_PATH=os.path.abspath(os.path.dirname(__file__)) 
 TST_FILE='psbk_manager_tst.cnf'
 
 MODEL_KEY='A_MODEL='
@@ -25,6 +26,11 @@ IP_KEY='A_IP='
 UID_KEY='A_UID='
 UPW_KEY='A_UPW='
 
+PICA8_KEY1="P-3290"
+PICA8_KEY2="P-3295"
+RIAVA_KEY1="BCM56846"
+PFS_KEY1="PF5240"
+CENTEC_KEY1="48T4X"
 #-------------------------------------------------------
 class psbk_manager:
 
@@ -98,7 +104,7 @@ class psbk_manager:
 				return -1
 
 		if TST_FLAG == 'ON':
-			tst_file= PY_PATH + TST_FILE
+			tst_file= '%s/%s' % (PY_PATH, TST_FILE)
 
 			try:
 				f=open(tst_file, 'r')
@@ -149,17 +155,17 @@ class psbk_manager:
 			bk_dir_tmp=self.bk_dir.replace(".", ":")
 
 			# backup procedure
-			if ((True == self.a_model[i].startswith("P-3295")) or (True == self.a_model[i].startswith("P-3290"))):
+			if ((True == self.a_model[i].startswith(PICA8_KEY1)) or (True == self.a_model[i].startswith(PICA8_KEY2))):
 				bk=pica8_if.pica8_if()
-
-			if (True == self.a_model[i].startswith("BCM56846" )):
+			elif  (True == self.a_model[i].startswith(RIAVA_KEY1)):
 				bk=riava_if.riava_if()
-
-			if (True == self.a_model[i].startswith("PF5240" )):
+			elif  (True == self.a_model[i].startswith(PFS_KEY1)):
 				bk=pfs_if.pfs_if()
-
-			if (True == self.a_model[i].startswith("48T4X" )):
+			elif  (True == self.a_model[i].startswith(CENTEC_KEY1)):
 				bk=centec_if.centec_if()
+			else:
+				self.__except_log__('Physical Switch info err %s' % self.a_model[i])
+				return -1				
 
 			bk.set_auth(self.auth)
 			bk.set_host_name(self.a_host[i])
@@ -253,17 +259,17 @@ class psbk_manager:
 			bk_dir_tmp=self.bk_dir.replace(".", ":")
 
 			# restore procedure
-			if ((True == self.a_model[i].startswith("P-3295")) or (True == self.a_model[i].startswith("P-3290"))):
+			if ((True == self.a_model[i].startswith(PICA8_KEY1)) or (True == self.a_model[i].startswith(PICA8_KEY2))):
 				rst=pica8_if.pica8_if()
-
-			if (True == self.a_model[i].startswith("BCM56846" )):
+			elif  (True == self.a_model[i].startswith(RIAVA_KEY1)):
 				rst=riava_if.riava_if()
-
-			if (True == self.a_model[i].startswith("PF5240" )):
+			elif  (True == self.a_model[i].startswith(PFS_KEY1)):
 				rst=pfs_if.pfs_if()
-
-			if (True == self.a_model[i].startswith("48T4X" )):
+			elif  (True == self.a_model[i].startswith(CENTEC_KEY1)):
 				rst=centec_if.centec_if()
+			else:
+				self.__except_log__('Physical Switch info err %s' % self.a_model[i])
+				return -1				
 
 			rst.set_auth(self.auth)
 			rst.set_host_name(self.a_host[i])

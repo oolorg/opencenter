@@ -1,5 +1,6 @@
 import urllib2
 import json
+import os
 
 import logging.handlers
 
@@ -8,27 +9,42 @@ import logging.handlers
 #    OFF: read data from device manager
 STUB_FLAG = 'OFF'
 Home_dir='./'
-PY_PATH='/usr/share/pyshared/opencenter/backends/nova/'
+PY_PATH=os.path.abspath(os.path.dirname(__file__)) 
 CNF_FILE='db_info.cnf'
 
 DB_URL_KEY ='DB_URL='
 DB_PORT_KEY='DB_PORT='
 ROOT_DIR='/ool_rm/'
 
-PLANE_LIST=['C-Plane','M-Plane','D-Plane','S-Plane']
+PLANE_LIST=['C-Plane','M-Plane','D-Plane','S-Plane','B-Plane']
 
-DBG_FLAG='ON'
+DBG_FLAG='OFF'
+#DBG_FLAG='ON'
+
+ERR_MSG_DEVICE='NOT found device name'
+ERR_MSG_CLUSTER='NOT found cluster name'
+ERR_MSG_TENNANT='NOT found tenant name'
+
+GET_NODE_KEY=['device_name','status','owner','site','traffic_type']
+GET_SWITCH_KEY=['device_name','status','owner','site']
+GET_PORT_KEY=['device_name','port_name','band','openflow_flg']
+GET_NIC_KEY=['device_name','nic_name','band','mac_address','ip_address','traffic_type']
+GET_USED_KEY=['device_name','user_name']
+GET_TENANT_KEY=['device_name','tenant_name']
+GET_BACKUP_KEY=['cluster_name','backup_name']
+
 ####add##########
-LOG_FILENAME = 'logging_rotatingfile_example.out'
-
-# Set up a specific logger with our desired output level
-my_logger = logging.getLogger('MyLogger')
-my_logger.setLevel(logging.DEBUG)
-
-# Add the log message handler to the logger
-handler = logging.handlers.RotatingFileHandler(LOG_FILENAME, maxBytes=20, backupCount=5)
-
-my_logger.addHandler(handler)
+if 'ON' == DBG_FLAG:
+	LOG_FILENAME = 'logging_ool_rm_if.out'
+	
+	# Set up a specific logger with our desired output level
+	my_logger = logging.getLogger('MyLogger')
+	my_logger.setLevel(logging.DEBUG)
+	
+	# Add the log message handler to the logger
+	handler = logging.handlers.RotatingFileHandler(LOG_FILENAME, maxBytes=20, backupCount=5)
+	
+	my_logger.addHandler(handler)
 ####add##########
 
 class ool_rm_if:
@@ -36,8 +52,10 @@ class ool_rm_if:
 	def __init__(self):
 		self.auth   =''
 		# load configfile
-		c_file= PY_PATH + CNF_FILE
+		c_file= '%s/%s' % (PY_PATH, CNF_FILE)
 
+		if 'ON' == DBG_FLAG:
+			my_logger.debug('c_file:%s' %(c_file))
 		try:
 			f=open(c_file, 'r')
 		except:
@@ -82,34 +100,57 @@ class ool_rm_if:
 		return self.rm_create.set_nic_dataImpl(device_name, nic_data)
 	def set_used_data(self, device_name, used_data):
 		return self.rm_create.set_used_dataImpl(device_name, used_data)
+	def set_tenant_data(self, tenant_name, tenant_data):
+		return self.rm_create.set_tenant_dataImpl(tenant_data, tenant_name=tenant_name)
+	def set_tenant_device_data(self, device_name, tenant_data):
+		return self.rm_create.set_tenant_dataImpl(tenant_data, device_name=device_name)
 	def set_backup_data(self, cluster_name, backup_name, device_list):
 		return self.rm_create.set_backup_dataImpl(cluster_name, backup_name, device_list)
 
 #--get interface
-	def get_device(self, dev_name):
-		return self.get_node(dev_name)
-	def get_node(self, dev_name):
-		return self.rm_get.get_nodeImpl(dev_name)
+	def get_device(self, device_name):
+		return self.get_node(device_name)
+	def get_node(self, device_name):
+		return self.get_node_query(device_name=device_name)
 	def get_device_all(self):
 		return self.get_node_all()
 	def get_node_all(self):
-		return self.rm_get.get_node_allImpl()
-	def get_switch(self, sw_name):
-		return self.rm_get.get_switchImpl(sw_name)
+		return self.get_node_query()
+	def get_node_query(self, **query):
+		return self.rm_get.get_nodeImpl(query)
+	def get_switch(self, device_name):
+		return self.get_switch_query(device_name=device_name)
 	def get_switch_all(self):
-		return self.rm_get.get_switch_allImpl()
-	def get_port(self, sw_name):
-		return self.rm_get.get_portImpl(sw_name)
-	def get_nic(self, dev_name):
-		return self.rm_get.get_nicImpl(dev_name)
-	def get_nic_traffic_info(self, dev_name, traffic_type):
-		return self.rm_get.get_nicImpl(dev_name, traffic_type=traffic_type)
-	def get_used(self, dev_name, user_name):
-		return self.rm_get.get_usedImpl(dev_name, user_name)
-	def get_tenant(self, dev_name, tenant_name):
-		return self.rm_get.get_tenantImpl(dev_name, tenant_name)
+		return self.get_switch_query()
+	def get_switch_query(self, **query):
+		return self.rm_get.get_switchImpl(query)
+	def get_port(self, device_name):
+		return self.get_port_query(device_name=device_name)
+	def get_port_query(self, **query):
+		return self.rm_get.get_portImpl(query)
+	def get_nic(self, device_name):
+		return self.get_nic_query(device_name=device_name)
+	def get_nic_traffic_info(self, device_name, traffic_type):
+		t_type=''
+		for i in range(0, len(PLANE_LIST)):
+			if PLANE_LIST[i]==traffic_type:
+				t_type='{0:03d}'.format(i+1)
+				break
+		return self.get_nic_query(device_name=device_name, traffic_type=t_type)
+	def get_nic_query(self, **query):
+		return self.rm_get.get_nicImpl(query)
+	def get_used(self, device_name, user_name):
+		return self.get_used_query(device_name=device_name, user_name=user_name)
+	def get_used_query(self, **query):
+		return self.rm_get.get_usedImpl(query)
+	def get_tenant(self, device_name, tenant_name):
+		return self.get_tenant_query(device_name=device_name, tenant_name=tenant_name)
+	def get_tenant_query(self, **query):
+		return self.rm_get.get_tenantImpl(query)
 	def get_backup_cluster(self, cluster_name):
-		return self.rm_get.get_backup_clusterImpl(cluster_name)
+		return self.get_backup_query(cluster_name=cluster_name)
+	def get_backup_query(self,  **query):
+		return self.rm_get.get_backupImpl(query)
 
 #--update interface
 
@@ -119,21 +160,27 @@ class ool_rm_if:
 	def del_switch(self, device_name):
 		return self.rm_delete.del_switchImpl(device_name)
 	def del_port(self, device_name, port_name):
-		return self.rm_delete.del_portImpl(device_name, port_name=port_name)
+		return self.del_port_query(device_name=device_name, port_name=port_name)
 	def del_port_all(self, device_name):
-		return self.rm_delete.del_portImpl(device_name)
+		return self.del_port_query(device_name=device_name)
+	def del_port_query(self, **query):
+		return self.rm_delete.del_portImpl(query)
 	def del_nic(self, device_name, nic_name):
-		return self.rm_delete.del_nicImpl(device_name, nic_name=nic_name)
+		return self.del_nic_query(device_name=device_name, nic_name=nic_name)
 	def del_nic_all(self, device_name):
-		return self.rm_delete.del_nicImpl(device_name)
+		return self.del_nic_query(device_name=device_name)
+	def del_nic_query(self, **query):
+		return self.rm_delete.del_nicImpl(query)
 	def del_used(self, device_name):
 		return self.rm_delete.del_usedImpl(device_name)
-	def del_tenant(self, dev_name, tenant_name):
-		return self.rm_get.del_tenantImpl(dev_name, tenant_name)
+	def del_tenant(self, device_name, tenant_name):
+		return self.rm_get.del_tenantImpl(device_name, tenant_name)
 	def del_backup(self, cluster_name, backup_name):
-		return self.rm_delete.del_backupImpl(cluster_name, backup_name=backup_name)
+		return self.del_backup_query(cluster_name=cluster_name, backup_name=backup_name)
 	def del_backup_cluster(self, cluster_name):
-		return self.rm_delete.del_backupImpl(cluster_name)
+		return self.del_backup_query(cluster_name=cluster_name)
+	def del_backup_query(self, **query):
+		return self.rm_delete.del_backupImpl(query)
 
 #--common
 class ool_rm_if_common:
@@ -167,8 +214,8 @@ class ool_rm_if_common:
 				read_data=self.url_head_read_tst(url)
 			else:
 				read_data=json.load(urllib2.urlopen(url), encoding='utf8')
-#				if 'ON' == DBG_FLAG:
-#					my_logger.debug('read url:%s' %(url))
+				if 'ON' == DBG_FLAG:
+					my_logger.debug('read url:%s' %(url))
 			return read_data
 		except Exception, e:
 			self.errmsg=e
@@ -191,6 +238,8 @@ class ool_rm_if_common:
 					req.get_method = lambda: 'DELETE'
 				response =urllib2.urlopen(req)
 				output   =json.load(response, encoding='utf8')
+				if 'ON' == DBG_FLAG:
+					my_logger.debug('read url:%s' %(url))
 			return output
 		except Exception, e:
 			self.errmsg=e
@@ -282,6 +331,19 @@ class ool_rm_if_createImpl(ool_rm_if_common):
 		url_para='%sUsed' % (ROOT_DIR)
 		return self.set_data(url_para, body)
 
+	def set_tenant_dataImpl(self, tenant_data, **key):
+		body={}
+		body.update({'auth':self.auth})
+		if 'device_name' in key:
+			url_para='%sTenant/%s' % (ROOT_DIR, 'Device')
+			body.update({'device_name':key['device_name']})
+		elif 'tenant_name' in key:
+			url_para='%sTenant/%s' % (ROOT_DIR, 'Tenant')
+			body.update({'tenant_name':key['tenant_name']})
+		body.update({'params':tenant_data})
+
+		return self.set_data(url_para, body)
+
 	def set_backup_dataImpl(self, cluster_name, backup_name, device_list):
 		body={"auth":"","params":{"cluster_name":"","backup_name":"","device":""}}	
 		body['auth']                  = self.auth
@@ -314,17 +376,9 @@ class ool_rm_if_getImpl(ool_rm_if_common):
 
 	def get_node_filter(self, data):
 		url_para='%sNode?' %(ROOT_DIR)
-		if "device_name" in data:
-			url_para=url_para + 'device_name=%s&' % (data['device_name'])
-		if "status" in data:
-			url_para=url_para + 'status=%s&' % (data['staus'])
-		if "owner" in data:
-			url_para=url_para + 'owner=%s&' % (data['owner'])
-		if "site" in data:
-			url_para=url_para + 'site=%s&' % (data['site'])
-		if "traffic_type" in data:
-			url_para=url_para + 'traffic_type=%s&' % (data['traffic_type'])
-
+		for key_str in GET_NODE_KEY:
+			if key_str in data:
+				url_para=url_para + '%s=%s&' % (key_str, data[key_str])
 		url_para=url_para + 'auth=%s' % (self.auth)
 
 		dev_info=self.get_data(url_para)
@@ -332,15 +386,9 @@ class ool_rm_if_getImpl(ool_rm_if_common):
 
 	def get_switch_filter(self, data):
 		url_para='%sSwitch?' %(ROOT_DIR)
-		if "device_name" in data:
-			url_para=url_para + 'device_name=%s&' % (data['device_name'])
-		if "status" in data:
-			url_para=url_para + 'status=%s&' % (data['staus'])
-		if "owner" in data:
-			url_para=url_para + 'owner=%s&' % (data['owner'])
-		if "site" in data:
-			url_para=url_para + 'site=%s&' % (data['site'])
-
+		for key_str in GET_SWITCH_KEY:
+			if key_str in data:
+				url_para=url_para + '%s=%s&' % (key_str, data[key_str])
 		url_para=url_para + 'auth=%s' % (self.auth)
 
 		sw_info=self.get_data(url_para)
@@ -348,17 +396,16 @@ class ool_rm_if_getImpl(ool_rm_if_common):
 
 	def get_port_filter(self, data):
 		url_para='%sPort?' %(ROOT_DIR)
-		if "device_name" in data:
-			url_para=url_para + 'device_name=%s&' % (data['device_name'])
-		else:
-			return [-1,""]
-		if "port_name" in data:
-			url_para=url_para + 'port_name=%s&' % (data['port_name'])
-		if "band" in data:
-			url_para=url_para + 'band=%s&' % (data['band'])
-		if "openflow_flg" in data:
-			url_para=url_para + 'openflow_flg=%s&' % (data['openflow_flg'])
+		REQUIRED_KEY='device_name'
+		get_flag=0
+		for key_str in GET_PORT_KEY:
+			if key_str in data:
+				url_para=url_para + '%s=%s&' % (key_str, data[key_str])
+			if key_str == REQUIRED_KEY:
+				get_flag=1
 
+		if 0 == get_flag:
+			return [-1, ERR_MSG_DEVICE]
 		url_para=url_para + 'auth=%s' % (self.auth)
 
 		port_info=self.get_data(url_para)
@@ -366,21 +413,16 @@ class ool_rm_if_getImpl(ool_rm_if_common):
 
 	def get_nic_filter(self, data):
 		url_para='%sNic?' %(ROOT_DIR)
-		if "device_name" in data:
-			url_para=url_para + 'device_name=%s&' % (data['device_name'])
-		else:
-			return [-1,""]
-		if "nic_name" in data:
-			url_para=url_para + 'nic_name=%s&' % (data['nic_name'])
-		if "band" in data:
-			url_para=url_para + 'band=%s&' % (data['band'])
-		if "mac_address" in data:
-			url_para=url_para + 'mac_address=%s&' % (data['mac_address'])
-		if "ip_address" in data:
-			url_para=url_para + 'ip_address=%s&' % (data['ip_address'])
-		if "traffic_type" in data:
-			url_para=url_para + 'traffic_type=%s&' % (data['traffic_type'])
+		REQUIRED_KEY='device_name'
+		get_flag=0
+		for key_str in GET_NIC_KEY:
+			if key_str in data:
+				url_para=url_para + '%s=%s&' % (key_str, data[key_str])
+			if key_str == REQUIRED_KEY:
+				get_flag=1
 
+		if 0 == get_flag:
+			return [-1, ERR_MSG_DEVICE]
 		url_para=url_para + 'auth=%s' % (self.auth)
 
 		nic_info=self.get_data(url_para)
@@ -388,160 +430,119 @@ class ool_rm_if_getImpl(ool_rm_if_common):
 
 	def get_used_filter(self, data):
 		url_para='%sUsed?' %(ROOT_DIR)
-		if "device_name" in data:
-			url_para=url_para + 'device_name=%s&' % (data['device_name'])
-		if "user_name" in data:
-			url_para=url_para + 'user_name=%s&' % (data['user_name'])
-
+		for key_str in GET_USED_KEY:
+			if key_str in data:
+				url_para=url_para + '%s=%s&' % (key_str, data[key_str])
 		url_para=url_para + 'auth=%s' % (self.auth)
+
 		used_info=self.get_data(url_para)
 		return used_info
 
 	def get_tenant_filter(self, data):
 		url_para='%sTenant?' %(ROOT_DIR)
-		if "device_name" in data:
-			url_para=url_para + 'device_name=%s&' % (data['device_name'])
-		if "tenant_name" in data:
-			url_para=url_para + 'tenant_name=%s&' % (data['tenant_name'])
-
+		for key_str in GET_TENANT_KEY:
+			if key_str in data:
+				url_para=url_para + '%s=%s&' % (key_str, data[key_str])
 		url_para=url_para + 'auth=%s' % (self.auth)
+
 		tenant_info=self.get_data(url_para)
 		return tenant_info
 
 	def get_backup_filter(self, data):
 		url_para='%sBackup?' %(ROOT_DIR)
-		if "cluster_name" in data:
-			url_para=url_para + 'cluster_name=%s&' % (data['cluster_name'])
-		if "backup_name" in data:
-			url_para=url_para + 'backup_name=%s&' % (data['backup_name'])
-
+		for key_str in GET_BACKUP_KEY:
+			if key_str in data:
+				url_para=url_para + '%s=%s&' % (key_str, data[key_str])
 		url_para=url_para + 'auth=%s' % (self.auth)
+
 		bk_info=self.get_data(url_para)
 		return bk_info
 
 #--get Impl
-	def get_nodeImpl(self, dev_name, **key):
-		para = {'device_name':''}
-		para['device_name'] = dev_name
-		if 'status' in key:
-			para.update({'status':key['status']})
-		if 'owner' in key:
-			para.update({'owner':key['owner']})
-		if 'site' in key:
-			para.update({'site':key['site']})
-		if 'traffic_type' in key:
-			para.update({'traffic_type':key['traffic_type']})
+	def get_nodeImpl(self, key):
+		para = {}
+		for key_str in GET_NODE_KEY:
+			if key_str in key:
+				para.update({key_str:key[key_str]})
 
 		dev_info=self.get_node_filter(para)
 		if -1==dev_info[0]:
-			return dev_info
+			return [dev_info,'']
 		else:
-			dev_data=self.__list2dict__(dev_info[1])
+			if 0==len(para):
+				dev_data=[]
+				dev_info_wk=dev_info[1]
+				for i in range(0,len(dev_info_wk)):
+					dev_wk=self.__list2dict__(dev_info_wk[i])
+					dev_data.append(dev_wk['device_name'])
+			else:
+				dev_data=self.__list2dict__(dev_info[1])
 			return [0, dev_data]
 
-	def get_node_allImpl(self):
-		para={}
-		dev_info=self.get_node_filter(para)
-		if -1==dev_info[0]:
-			return dev_info
-		else:
-			dev_data=[]
-			dev_info_wk=dev_info[1]
-			for i in range(0,len(dev_info_wk)):
-				dev_wk=self.__list2dict__(dev_info_wk[i])
-				dev_data.append(dev_wk['device_name'])
-			return [0, dev_data]
+	def get_switchImpl(self, key):
+		para = {}
+		for key_str in GET_SWITCH_KEY:
+			if key_str in key:
+				para.update({key_str:key[key_str]})
 
-	def get_switchImpl(self, sw_name, **key):
-		para = {'device_name':''}
-		para['device_name'] = sw_name
-		if 'status' in key:
-			para.update({'status':key['status']})
-		if 'owner' in key:
-			para.update({'owner':key['owner']})
-		if 'site' in key:
-			para.update({'site':key['site']})
-
-		dev_info=self.get_switch_filter(para)
-
-		if -1==dev_info[0]:
-			return dev_info
-		else:
-			dev_data=self.__list2dict__(dev_info[1])
-#			my_logger.debug('?????get switch:%s' %(dev_data))
-			return [0, dev_data]
-
-	def get_switch_allImpl(self):
-		para={}
 		sw_info=self.get_switch_filter(para)
 		if -1==sw_info[0]:
-			return sw_info
+			return [sw_info,'']
 		else:
-			sw_data=[]
-			sw_info_wk=sw_info[1]
-			for i in range(0, len(sw_info_wk)):
-				sw_wk=self.__list2dict__(sw_info_wk[i])
-				sw_data.append(sw_wk['device_name'])
-				sw_data.append(sw_wk['vender_name'])
-			return [0, sw_data]
+			if 0==len(para):
+				sw_data=[]
+				sw_info_wk=sw_info[1]
+				for i in range(0, len(sw_info_wk)):
+					sw_wk=self.__list2dict__(sw_info_wk[i])
+					sw_data.append(sw_wk['device_name'])
+					sw_data.append(sw_wk['vender_name'])
+			else:
+				sw_data=self.__list2dict__(sw_info[1])
+		return [0, sw_data]
 
-	def get_portImpl(self, sw_name, **key):
-		para = {'device_name':''}
-		para['device_name'] = sw_name
-		if 'port_name' in key:
-			para.update({'port_name':key['port_name']})
-		if 'band' in key:
-			para.update({'band':key['band']})
-		if 'openflow_flg' in key:
-			para.update({'openflow_flg':key['openflow_flg']})
+	def get_portImpl(self,  key):
+		para = {}
+		for key_str in GET_PORT_KEY:
+			if key_str in key:
+				para.update({key_str:key[key_str]})
+
 		port_info=self.get_port_filter(para)
 		return port_info
 
-	def get_nicImpl(self, dev_name, **key):
+	def get_nicImpl(self, key):
+		key_traffic_type='traffic_type' 
 		para = {}
-		para.update({'device_name':dev_name})
-		if 'nic_name' in key:
-			para.update({'nic_name':key['nic_name']})
-		if 'band' in key:
-			para.update({'band':key['band']})
-		if 'mac_address' in key:
-			para.update({'mac_address':key['mac_address']})
-		if 'ip_address' in key:
-			para.update({'ip_address':key['ip_address']})
-		if 'traffic_type' in key:
-			t_type=''
-			for i in range(0, len(PLANE_LIST)):
-				if PLANE_LIST[i]==key['traffic_type']:
-					t_type='{0:03d}'.format(i+1)
-					break
-			para.update({'traffic_type':t_type})
+		for key_str in GET_NIC_KEY:
+			if key_str in key:
+				para.update({key_str:key[key_str]})
 
 		nic_info=self.get_nic_filter(para)
 		return nic_info
 
-	def get_usedImpl(self, dev_name, user_name):
+	def get_usedImpl(self,  key):
 		para = {}
-		if '' != dev_name:
-			para.update({'device_name':dev_name})
-		if '' != user_name:
-			para.update({'user_name':dev_name})
+		for key_str in GET_USED_KEY:
+			if key_str in key:
+				para.update({key_str:key[key_str]})
+
 		used_info=self.get_used_filter(para)
 		return used_info
 
-	def get_tenantImpl(self, dev_name, tenant_name):
+	def get_tenantImpl(self, key):
 		para = {}
-		if '' != dev_name:
-			para.update({'device_name':dev_name})
-		if '' != tenant_name:
-			para.update({'tenant_name':tenant_name})
+		for key_str in GET_TENANT_KEY:
+			if key_str in key:
+				para.update({key_str:key[key_str]})
+
 		tenant_info=self.get_tenant_filter(para)
 		return tenant_info
 
-	def get_backup_clusterImpl(self, cluster_name, **key):
+	def get_backupImpl(self, key):
 		para = {}
-		para.update({'cluster_name':cluster_name})
-		if 'backup_name' in key:
-			para.update({'backup_name':key['backup_name']})
+		for key_str in GET_BACKUP_KEY:
+			if key_str in key:
+				para.update({key_str:key[key_str]})
+
 		backup_info=self.get_backup_filter(para)
 		return backup_info
 
@@ -583,7 +584,7 @@ class ool_rm_if_deleteImpl(ool_rm_if_common):
 		if "device_name" in data:
 			url_para=url_para + 'device_name=%s&' % (data['device_name'])
 		else:
-			return [-1,""]
+			return [-1, ERR_MSG_DEVICE]
 		url_para=url_para + 'auth=%s' % (self.auth)
 		ret=self.del_data(url_para, '')
 		return ret
@@ -601,7 +602,7 @@ class ool_rm_if_deleteImpl(ool_rm_if_common):
 		if "device_name" in data:
 			url_para=url_para + 'device_name=%s&' % (data['device_name'])
 		else:
-			return [-1,""]
+			return [-1, ERR_MSG_DEVICE]
 		if "port_name" in data:
 			url_para=url_para + 'port_name=%s&' % (data['port_name'])
 
@@ -614,7 +615,7 @@ class ool_rm_if_deleteImpl(ool_rm_if_common):
 		if "device_name" in data:
 			url_para=url_para + 'device_name=%s&' % (data['device_name'])
 		else:
-			return [-1,""]
+			return [-1, ERR_MSG_DEVICE]
 		if "nic_name" in data:
 			url_para=url_para + 'nic_name=%s&' % (data['nic_name'])
 
@@ -634,7 +635,7 @@ class ool_rm_if_deleteImpl(ool_rm_if_common):
 			if "tenant_name" in data:
 				url_para=url_para + 'tenant_name=%s&' % (data['tenant_name'])
 			else:
-				return [-1,""]
+				return [-1, ERR_MSG_TENNANT]
 
 		url_para=url_para + 'auth=%s' % (self.auth)
 		ret=self.del_data(url_para, '')
@@ -645,56 +646,74 @@ class ool_rm_if_deleteImpl(ool_rm_if_common):
 		if "cluster_name" in data:
 			url_para=url_para + 'cluster_name=%s&' % (data['cluster_name'])
 		else:
-			return [-1,""]
-		if "back_name" in data:
-			url_para=url_para + 'back_name=%s&' % (data['back_name'])
-		else:
-			return [-1,""]
+			return [-1, ERR_MSG_CLUSTER]
+		if "backup_name" in data:
+			url_para=url_para + 'backup_name=%s&' % (data['backup_name'])
+
 		url_para=url_para + 'auth=%s' % (self.auth)
 		ret=self.del_data(url_para, '')
 		return ret
 
 #------
-	def del_nodeImpl(self, dev_name):
+	def del_nodeImpl(self, device_name):
 		para = {}
-		para.update({'device_name':dev_name})
+		if '' != device_name:
+			para.update({'device_name':device_name})
+		else:
+			return[-1, ERR_MSG_DEVICE]
+
 		return self.del_node_filter(para)
 
-	def del_switchImpl(self, dev_name):
+	def del_switchImpl(self, device_name):
 		para = {}
-		para.update({'device_name':dev_name})
+		para.update({'device_name':device_name})
 		return self.del_switch_filter(para)
 
-	def del_portImpl(self, dev_name, **key):
+	def del_portImpl(self, key):
 		para = {}
-		para.update({'device_name':dev_name})
+		if 'device_name' in key:
+			para.update({'device_name':key['device_name']})
+		else:
+			return[-1, ERR_MSG_DEVICE]
+
 		if 'port_name' in key:
 			para.update({'port_name':key['port_name']})
 		return self.del_port_filter(para)
 
-	def del_nicImpl(self, dev_name, **key):
+	def del_nicImpl(self, key):
 		para = {}
-		para.update({'device_name':dev_name})
+		if 'device_name' in key:
+			para.update({'device_name':key['device_name']})
+		else:
+			return[-1, ERR_MSG_DEVICE]
+
 		if 'nic_name' in key:
 			para.update({'nic_name':key['nic_name']})
 		return self.del_nic_filter(para)
 
-	def del_usedImpl(self, dev_name):
+	def del_usedImpl(self, device_name):
 		para = {}
-		para.update({'device_name':dev_name})
+		if '' != device_name:
+			para.update({'device_name':device_name})
+		else:
+			return[-1, ERR_MSG_DEVICE]
 		return self.del_used_filter(para)
 
-	def del_tenantImpl(self, dev_name, tenant_name):
+	def del_tenantImpl(self, device_name, tenant_name):
 		para = {}
-		if '' != dev_name:
-			para.update({'device_name':dev_name})
+		if '' != device_name:
+			para.update({'device_name':device_name})
 		if '' != tenant_name:
 			para.update({'tenant_name':tenant_name})
 		return self.del_tenant_filter(para)
 
-	def del_backupImpl(self, cluster_name, **key):
+	def del_backupImpl(self, key):
 		para = {}
-		para.update({'cluster_name':cluster_name})
+		if 'cluster_name' in key:
+			para.update({'cluster_name':key['cluster_name']})
+		else:
+			return [-1, ERR_MSG_CLUSTER]
+
 		if 'backup_name' in key:
 			para.update({'backup_name':key['backup_name']})
 		return self.del_backup_filter(para)

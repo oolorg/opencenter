@@ -4,7 +4,6 @@ import logging
 import os.path
 
 BASE_DIR_NAME="/usr/share/pyshared/opencenter/backends/nova"
-#BASE_DIR_NAME="/usr/share/pyshared/testshell"
 CONFLICT_FILE='br_conflict.inf'
 MODE_BACKUP = "backup"
 MODE_RESTORE= "restore"
