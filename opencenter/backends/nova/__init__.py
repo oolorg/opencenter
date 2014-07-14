@@ -277,16 +277,9 @@ class NovaBackend(opencenter.backends.Backend):
         switch_list = switch['name'].split(',')
         logging.error('switch name = %s' % switch['name'])
 
-        nodes = api._model_get_all('nodes')
-        for node in nodes:
-            #node info get
-            nodeinfo = api.node_get_by_id(node['id'])
-            logging.error('nodeinfo = %s' % nodeinfo['name'])
-
-            if NOVA_CLUSTER_SW == nodeinfo['name']:
-                ofc_ip_list= nodeinfo['facts']['neutron_ofc_host'].split(',')
-                logging.error('OFC IP = %s' % nodeinfo['facts']['neutron_ofc_host'])
-                break
+        nodeinfo = api.node_get_by_id(nova_id)
+        ofc_ip_list= nodeinfo['facts']['neutron_ofc_host'].split(',')
+        logging.error('OFC IP = %s' % nodeinfo['facts']['neutron_ofc_host'])
 
         logging.error('token_id = %s' % kwargs['tokenid'])
 
