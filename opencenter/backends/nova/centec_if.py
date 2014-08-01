@@ -27,6 +27,8 @@ VERSION_10=10
 VERSION_11=11
 VERSION_13=13
 
+TIMEOUT=30
+
 WK_SRC_CONF='/tmp/work_src.conf'
 WK_DST_CONF='/tmp/work_dst.conf'
 
@@ -131,7 +133,7 @@ class centec_if:
 	def exec_backup(self):
 		self.__trace_log__('exec_backup IN')
 		# start backup
-		c = pexpect.spawn('telnet '+ self.ip)
+		c = pexpect.spawn('telnet %s' % (self.ip),  timeout=TIMEOUT)
 		if 'ON' == CONSOLE_OUT_FLAG:
 			c.logfile=sys.stdout
 
@@ -163,7 +165,7 @@ class centec_if:
 	def exec_restore(self):
 		self.__trace_log__('exec_restore IN')
 		# start restore
-		c = pexpect.spawn('telnet '+ self.ip)
+		c = pexpect.spawn('telnet %s' % (self.ip),  timeout=TIMEOUT)
 		if 'ON' == CONSOLE_OUT_FLAG:
 			c.logfile=sys.stdout
 
@@ -201,7 +203,7 @@ class centec_if:
 			self.__trace_log__('get_hw info error')
 			return -1
 
-		c = pexpect.spawn('telnet '+ self.ip)
+		c = pexpect.spawn('telnet %s' % (self.ip),  timeout=TIMEOUT)
 		if 'ON' == DBG_FLAG:
 			c.logfile=sys.stdout
 

@@ -17,6 +17,8 @@ SEND_YES='y'
 SEND_QUIT='quit'
 SEND_EXIT='exit'
 
+TIMEOUT=30
+
 #-----------------------------------
 class riava_if:
 
@@ -114,7 +116,7 @@ class riava_if:
 	def exec_backup(self):
 		self.__trace_log__('exec_backup IN')
 		# start backup
-		c = pexpect.spawn('telnet '+ self.ip)
+		c = pexpect.spawn('telnet %s' % (self.ip),  timeout=TIMEOUT)
 		if 'ON' == CONSOLE_OUT_FLAG:
 			c.logfile=sys.stdout
 
@@ -149,7 +151,7 @@ class riava_if:
 	def exec_restore(self):
 		self.__trace_log__('exec_restore IN')
 		# start restore
-		c = pexpect.spawn('telnet '+ self.ip)
+		c = pexpect.spawn('telnet %s' % (self.ip),  timeout=TIMEOUT)
 
 		if 'ON' == CONSOLE_OUT_FLAG:
 			c.logfile=sys.stdout

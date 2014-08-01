@@ -18,6 +18,8 @@ SEND_YES='yes'
 SEND_QUIT='quit'
 SEND_EXIT='exit'
 
+TIMEOUT=30
+
 TRACE_TITLE='PICA8:%s'
 EXCEPT_TITLE='PICA8-Error:%s'
 
@@ -139,7 +141,7 @@ class pica8_if:
 			return -1
 
 		# start backup
-		c = pexpect.spawn('telnet '+ self.ip)
+		c = pexpect.spawn('telnet %s' % (self.ip),  timeout=TIMEOUT)
 		if 'ON' == CONSOLE_OUT_FLAG:
 			c.logfile=sys.stdout
 
@@ -194,7 +196,7 @@ class pica8_if:
 			return -1
 
 		# start restore
-		c = pexpect.spawn('telnet '+ self.ip)
+		c = pexpect.spawn('telnet %s' % (self.ip),  timeout=TIMEOUT)
 		if 'ON' == CONSOLE_OUT_FLAG:
 			c.logfile=sys.stdout
 
@@ -247,7 +249,7 @@ class pica8_if:
 			self.__trace_log__('get_hw info error')
 			return -1
 
-		c = pexpect.spawn('telnet '+ self.ip)
+		c = pexpect.spawn('telnet %s' % (self.ip),  timeout=TIMEOUT)
 		if 'ON' == DBG_FLAG:
 			c.logfile=sys.stdout
 
@@ -277,7 +279,7 @@ class pica8_if:
 			# setup openflow
 			if '02' ==self.port[i]['vlan'][i]['vlan_type']:
 			
-				c = pexpect.spawn('telnet '+ self.ip)
+				c = pexpect.spawn('telnet %s' % (self.ip),  timeout=TIMEOUT)
 				if 'ON' == DBG_FLAG:
 					c.logfile=sys.stdout
 

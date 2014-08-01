@@ -25,6 +25,9 @@ SEND_YES='y'
 SEND_QUIT='quit'
 SEND_EXIT='exit'
 
+TIMEOUT=30
+WAIT_CNT=10
+
 WK_SRC_CONF='/tmp/work_src.conf'
 WK_DST_CONF='/tmp/work_dst.conf'
 
@@ -109,8 +112,12 @@ class pfs_if:
 		return 0
 
 	def __expectsendline__(self, spawn, expect, sendline):
-		spawn.expect(expect)
-		spawn.sendline(sendline)
+		try:
+			spawn.expect(expect,  timeout=TIMEOUT)
+			spawn.sendline(sendline)
+			return 0
+		except:
+			return -1
 
 	def set_auth(self, auth):
 		self.auth=auth
@@ -131,11 +138,16 @@ class pfs_if:
 	def exec_backup(self):
 		self.__trace_log__('exec_backup IN')
 		# start backup
-		c = pexpect.spawn('telnet '+ self.ip)
-		if 'ON' == CONSOLE_OUT_FLAG:
-			c.logfile=sys.stdout
+		for i in range(1,WAIT_CNT):
+			c = pexpect.spawn('telnet %s' % (self.ip),  timeout=TIMEOUT)
+			if 'ON' == CONSOLE_OUT_FLAG:
+				c.logfile=sys.stdout
 
-		self.__expectsendline__(c, EXPECT_LOGIN, self.uname)
+			ret = self.__expectsendline__(c, EXPECT_LOGIN, self.uname)
+			if 0 == ret:
+				break
+			c.close
+			continue
 
 		i = c.expect([EXPECT_PASSWD])
 		if 0==i:
@@ -175,11 +187,16 @@ class pfs_if:
 		self.__trace_log__('exec_restore IN')
 
 		# start restore
-		c = pexpect.spawn('telnet '+ self.ip)
-		if 'ON' == CONSOLE_OUT_FLAG:
-			c.logfile=sys.stdout
+		for i in range(1,WAIT_CNT):
+			c = pexpect.spawn('telnet %s' % (self.ip),  timeout=TIMEOUT)
+			if 'ON' == CONSOLE_OUT_FLAG:
+				c.logfile=sys.stdout
 
-		self.__expectsendline__(c, EXPECT_LOGIN, self.uname)
+			ret = self.__expectsendline__(c, EXPECT_LOGIN, self.uname)
+			if 0 == ret:
+				break
+			c.close
+			continue
 
 		i = c.expect([EXPECT_PASSWD])
 		if 0==i:
@@ -229,11 +246,16 @@ class pfs_if:
 			self.__trace_log__('settup_ofc:get_hw info error')
 			return -1
 
-		c = pexpect.spawn('telnet '+ self.ip)
-		if 'ON' == DBG_FLAG:
-			c.logfile=sys.stdout
+		for i in range(1,WAIT_CNT):
+			c = pexpect.spawn('telnet %s' % (self.ip),  timeout=TIMEOUT)
+			if 'ON' == CONSOLE_OUT_FLAG:
+				c.logfile=sys.stdout
 
-		self.__expectsendline__(c, EXPECT_LOGIN, self.uname)
+			ret = self.__expectsendline__(c, EXPECT_LOGIN, self.uname)
+			if 0 == ret:
+				break
+			c.close
+			continue
 
 		i = c.expect([EXPECT_PASSWD])
 		if 0==i:
