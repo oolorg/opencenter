@@ -8,30 +8,30 @@ import logging.handlers
 #    ON : read test file
 #    OFF: read data from device manager
 STUB_FLAG = 'OFF'
-Home_dir='./'
-PY_PATH=os.path.abspath(os.path.dirname(__file__)) 
-CNF_FILE='db_info.cnf'
+HOME_DIR = './'
+PY_PATH = os.path.abspath(os.path.dirname(__file__)) 
+CNF_FILE = 'db_info.cnf'
 
-DB_URL_KEY ='DB_URL='
-DB_PORT_KEY='DB_PORT='
-ROOT_DIR='/ool_rm/'
+DB_URL_KEY = 'DB_URL='
+DB_PORT_KEY = 'DB_PORT='
+ROOT_DIR = '/ool_rm/'
 
-PLANE_LIST=['C-Plane','M-Plane','D-Plane','S-Plane','B-Plane']
+PLANE_LIST = ['C-Plane', 'M-Plane', 'D-Plane', 'S-Plane', 'B-Plane']
 
-DBG_FLAG='OFF'
-#DBG_FLAG='ON'
+DBG_FLAG = 'OFF'
+#DBG_FLAG = 'ON'
 
-ERR_MSG_DEVICE='NOT found device name'
-ERR_MSG_CLUSTER='NOT found cluster name'
-ERR_MSG_TENNANT='NOT found tenant name'
+ERR_MSG_DEVICE = 'NOT found device name'
+ERR_MSG_CLUSTER = 'NOT found cluster name'
+ERR_MSG_TENNANT = 'NOT found tenant name'
 
-GET_NODE_KEY=['device_name','status','owner','site','traffic_type']
-GET_SWITCH_KEY=['device_name','status','owner','site']
-GET_PORT_KEY=['device_name','port_name','band','openflow_flg']
-GET_NIC_KEY=['device_name','nic_name','band','mac_address','ip_address','traffic_type']
-GET_USED_KEY=['device_name','user_name','tenant_name']
-GET_TENANT_KEY=['device_name','tenant_name']
-GET_BACKUP_KEY=['cluster_name','backup_name']
+GET_NODE_KEY   = ['device_name','status','owner','site','traffic_type']
+GET_SWITCH_KEY = ['device_name','status','owner','site']
+GET_PORT_KEY   = ['device_name','port_name','band','openflow_flg']
+GET_NIC_KEY    = ['device_name','nic_name','band','mac_address','ip_address','traffic_type']
+GET_USED_KEY   = ['device_name','user_name','tenant_name']
+GET_TENANT_KEY = ['device_name','tenant_name']
+GET_BACKUP_KEY = ['cluster_name','backup_name']
 
 ####add##########
 if 'ON' == DBG_FLAG:
@@ -510,7 +510,6 @@ class ool_rm_if_getImpl(ool_rm_if_common):
 		return port_info
 
 	def get_nicImpl(self, key):
-		key_traffic_type='traffic_type' 
 		para = {}
 		for key_str in GET_NIC_KEY:
 			if key_str in key:
@@ -642,7 +641,7 @@ class ool_rm_if_deleteImpl(ool_rm_if_common):
 		return ret
 
 	def del_backup_filter(self, data):
-		url_para='%sBackup?' % (ROOT_DIR)
+		url_para = '%sBackup?' % (ROOT_DIR)
 		if "cluster_name" in data:
 			url_para = url_para + 'cluster_name=%s&' % (data['cluster_name'])
 		else:
@@ -728,52 +727,52 @@ class ool_rm_if_tst:
 
 		data={}
 		if -1 != wk.find(ROOT_DIR + 'Node?auth='):
-			f = open(Home_dir + "test_data/dev_cnf_all.txt", 'r')
+			f = open(HOME_DIR + "test_data/dev_cnf_all.txt", 'r')
 			data = json.load(f)
 			f.close()
 			return data
 		else:
 			if -1 !=  wk.find(ROOT_DIR + 'Node?device_name='):
-				r_fname = '%stest_data/dev_cnf_%s.txt' % (Home_dir, wk[wk.rfind('_name=')+6:wk.find('&')])
+				r_fname = '%stest_data/dev_cnf_%s.txt' % (HOME_DIR, wk[wk.rfind('_name=')+6:wk.find('&')])
 				f = open(r_fname, 'r')
 				data = json.load(f)
 				f.close()
 				return data
 
 		if -1 != wk.find(ROOT_DIR + 'Switch?auth='):
-			f = open(Home_dir + "test_data/sw_cnf_all.txt", 'r')
+			f = open(HOME_DIR + "test_data/sw_cnf_all.txt", 'r')
 			data = json.load(f)
 			f.close()
 			return data
 		else:
 			if -1 !=  wk.find(ROOT_DIR + 'Switch?device_name='):
-				r_fname = '%stest_data/sw_cnf_%s.txt' % (Home_dir, wk[wk.rfind('_name=')+6:wk.find('&')])
+				r_fname = '%stest_data/sw_cnf_%s.txt' % (HOME_DIR, wk[wk.rfind('_name=')+6:wk.find('&')])
 				f = open(r_fname, 'r')
 				data = json.load(f)
 				f.close()
 				return data
 
 		if -1 != wk.find(ROOT_DIR + 'Port?'):
-			f = open(Home_dir + "test_data/port_cnf.txt", 'r')
+			f = open(HOME_DIR + "test_data/port_cnf.txt", 'r')
 			data = json.load(f)
 			f.close()
 			return data
 
 		if -1 != wk.find(ROOT_DIR + 'Nic?traffic_type='):
-			r_fname = '%stest_data/nic_cnf_%s.txt' % (Home_dir, wk[wk.rfind('_type=')+6:wk.find('&')])
+			r_fname = '%stest_data/nic_cnf_%s.txt' % (HOME_DIR, wk[wk.rfind('_type=')+6:wk.find('&')])
 			f = open(r_fname, 'r')
 			data = json.load(f)
 			f.close()
 			return data
 		else:
 			if -1 != wk.find(ROOT_DIR + 'Nic?'):
-				f = open(Home_dir + "test_data/nic_cnf.txt", 'r')
+				f = open(HOME_DIR + "test_data/nic_cnf.txt", 'r')
 				data = json.load(f)
 				f.close()
 				return data
 
 		if -1 != wk.find(ROOT_DIR + 'Backup?'):
-			f = open(Home_dir + "test_data/backup_cnf.txt", 'r')
+			f = open(HOME_DIR + "test_data/backup_cnf.txt", 'r')
 			data = json.load(f)
 			f.close()
 			return data
@@ -782,7 +781,7 @@ class ool_rm_if_tst:
 		wk = str(url)
 
 		if -1 != wk.find(ROOT_DIR + 'Backup?auth='):
-			f = open(Home_dir + "test_data/backup_wdata.txt", 'w')
+			f = open(HOME_DIR + "test_data/backup_wdata.txt", 'w')
 			f.write(body)
 			f.close()
 			return {"result":[''],"status":200}
