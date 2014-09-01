@@ -50,6 +50,8 @@ DEBUG="OFF"
 B_STOP_FILENAME="/b_stop"
 R_STOP_FILENAME="/r_stop"
 LOOP_TIME_OUT=60
+RESTORE_MAX_INDEX=2
+
 
 MODE_BACKUP = "backup"
 MODE_RESTORE= "restore"
@@ -75,6 +77,13 @@ BACKUP_DATA_KEY_BACKENDS ="backends"
 BACKUP_DATA_KEY_N_ID ="id"
 
 
+BR_AGENT_SRC_DIR='/etc/backuprestore'
+BR_AGENT_DST_DIR='/boot'
+
+BR_ORG_UPDATE='br.org_update'
+BR_ORG='br.org'
+
+
 ###############################
 #Server Backup Up Manager
 ###############################
@@ -85,6 +94,7 @@ class svbk_manager:
         self.interval_time=INTERVAL_TIME
         self.loop_timeout_m=LOOP_TIME_OUT
         self.opencenter_server_name=""
+        self.restore_maxFolderNum_OpenOrion = RESTORE_MAX_INDEX
         self.storage_server_name=""
         self.logpath="/var/log/br/"
         self.logfile="ddd.log"
@@ -449,6 +459,12 @@ class svbk_manager:
             return [-1,'NG']
 
     def set_server_info(self, node_id, server_info_list,server_name, name, br_mode):
+        return self.set_server_info_Common(node_id, server_info_list,server_name, name, br_mode, 'M-Plane')
+
+    def set_server_info_CPlane(self, node_id, server_info_list,server_name, name, br_mode):
+        return self.set_server_info_Common(node_id, server_info_list,server_name, name, br_mode, 'C-Plane')
+
+    def set_server_info_Common(self, node_id, server_info_list,server_name, name, br_mode, Plane):
 
         #make Resource Manager Instance
         temp_server_info=server_info_list
@@ -458,7 +474,7 @@ class svbk_manager:
         self.br_log(node_id, name, br_mode, "ddddd self.token:%s" %(self.token))
 
         #get IP address
-        data=ori.get_nic_traffic_info(server_name, 'M-Plane')
+        data=ori.get_nic_traffic_info(server_name, Plane)
         #get ip address
         if -1 != data[0]:
             data1={}
@@ -1160,7 +1176,8 @@ class svbk_manager:
         #################################
         #B Check Strorage Server Disk Size
         ################################
-        cmd="ssh root@%s df -k | grep '/dev/sda1' | awk '{ print $4 }' " %(server_info[STORAGE_SV][IP_INDEX])
+#        cmd="ssh root@%s df -k | grep '/dev/sda1' | awk '{ print $4 }' " %(server_info[STORAGE_SV][IP_INDEX])
+        cmd="ssh root@%s df -k | grep '/dev/mapper/storage--vg-root' | awk '{ print $4 }' " %(server_info[STORAGE_SV][IP_INDEX])
         ret_list = self.shellcmd_exec_rest_diskSize(EXEC_USER, br_mode, node_id, CLSTER_NAME,cmd)
         if 0 != ret_list[0]:
             #self.logger.debug('Set Server info set server_node_name=%s' %(server_node_name[i-1]))
@@ -1271,27 +1288,33 @@ class svbk_manager:
         ################
         #B Run backup
         ################
-        self.br_log(node_id, CLSTER_NAME, br_mode, '#### Run backup')
+        self.br_log(node_id, CLSTER_NAME, br_mode, '#### Run backup2')
 
-        #ssh root@\${SV$i[0]} /boot/br_agent \${SV$i[1]} \${SV$i[2]} \$mode \$SAVE_DIR_NAME
         for i in range(START_INDEX, server_cnt):
             # update_br_agent
             svbkutl=svbk_utls.svbk_utls()
             ret =svbkutl.update_br_agent(server_info[i][USER_INDEX], server_info[i][IP_INDEX])
             if NG == ret[0]:
-                self.br_log(node_id, CLSTER_NAME, br_mode, '#### update_br_agent backup err ')
-                msg='update_br_agent backup err'
+                msg='update_br_agent backup [%s] err ' % (server_info[i][IP_INDEX])
+                self.br_log(node_id, CLSTER_NAME, br_mode, msg )
                 return [NG, msg]
 
+            #copy br.org_update for fast
+            ret =svbkutl.update_br_org(server_info[i][USER_INDEX], server_info[i][IP_INDEX])
+            if NG == ret[0]:
+                msg='copy br.org_update [%s] err ' % (server_info[i][IP_INDEX])
+                self.br_log(node_id, CLSTER_NAME, br_mode, msg )
+                return [NG, msg]
+
+            #exec br_agent
             cmd='ssh root@%s /boot/%s %s %s b %s' %(server_info[i][IP_INDEX], svbkutl.get_br_agent_name(), server_info[i][USER_INDEX], server_info[i][PW_INDEX], SAVE_DIR_NAME)
-            #ret = self.shellcmd_exec(EXEC_USER,cmd)
             ret = self.shellcmd_exec(EXEC_USER,br_mode, node_id, CLSTER_NAME, cmd)
             if ret!=0:
-                #self.logger.debug('make run backup err '  )
-                self.br_log(node_id, CLSTER_NAME, br_mode, '#### make run backup err ')
-                #return self._fail(msg='make run backup err')
-                msg='make run backup err'
+                msg='make run backup  [%s] err ' % (server_info[i][IP_INDEX])
+                self.br_log(node_id, CLSTER_NAME, br_mode, msg )
                 return [NG, msg]
+
+
 
         ################
         #B Start status check
@@ -1757,28 +1780,31 @@ class svbk_manager:
             return [NG, msg]
 
         ################
-        #R Run backup
+        #R Run Restore
         ################
-        self.br_log(node_id, CLSTER_NAME, br_mode, '#### Run backup')
+        self.br_log(node_id, CLSTER_NAME, br_mode, '#### Run Restore2')
 
-        #ssh root@\${SV$i[0]} /boot/br_agent \${SV$i[1]} \${SV$i[2]} \$mode \$SAVE_DIR_NAME
         for i in range(START_INDEX, server_cnt):
             # update_br_agent
             svbkutl=svbk_utls.svbk_utls()
             ret = svbkutl.update_br_agent(server_info[i][USER_INDEX], server_info[i][IP_INDEX])
             if NG == ret[0]:
-                self.br_log(node_id, CLSTER_NAME, br_mode, '#### update_br_agent restore err ')
-                msg='update_br_agent restore err'
+                msg='update_br_agent backup [%s] err ' % (server_info[i][IP_INDEX])
+                self.br_log(node_id, CLSTER_NAME, br_mode, msg )
+                return [NG, msg]
+
+            #copy br.org_update for fast
+            ret =svbkutl.update_br_org(server_info[i][USER_INDEX], server_info[i][IP_INDEX])
+            if NG == ret[0]:
+                msg='copy br.org_update [%s] err ' % (server_info[i][IP_INDEX])
+                self.br_log(node_id, CLSTER_NAME, br_mode, msg )
                 return [NG, msg]
 
             cmd='ssh root@%s /boot/%s %s %s r %s' %(server_info[i][IP_INDEX], svbkutl.get_br_agent_name(), server_info[i][USER_INDEX], server_info[i][PW_INDEX], SAVE_DIR_NAME)
-            #ret = self.shellcmd_exec(EXEC_USER,cmd)
             ret = self.shellcmd_exec(EXEC_USER,br_mode, node_id, CLSTER_NAME, cmd)
             if ret!=0:
-                #self.logger.debug('make run backup err '  )
-                self.br_log(node_id, CLSTER_NAME, br_mode, '#### make run restore err ')
-                #return self._fail(msg='make run restore err')
-                msg='make run backup err'
+                msg='make run resotre  [%s] err ' % (server_info[i][IP_INDEX])
+                self.br_log(node_id, CLSTER_NAME, br_mode, msg )
                 return [NG, msg]
 
         ################
