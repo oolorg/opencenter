@@ -144,7 +144,16 @@ class ool_rm_if:
 	def get_used_query(self, **query):
 		return self.rm_get.get_usedImpl(query)
 	def get_tenant(self, device_name, tenant_name):
-		return self.get_tenant_query(device_name=device_name, tenant_name=tenant_name)
+		if device_name:
+			if tenant_name:
+				return self.get_tenant_query(device_name=device_name, tenant_name=tenant_name)
+			else:
+				return self.get_tenant_query(device_name=device_name)
+		else:
+			if tenant_name:
+				return self.get_tenant_query(tenant_name=tenant_name)
+			else:
+				return self.get_tenant_query()
 	def get_tenant_query(self, **query):
 		return self.rm_get.get_tenantImpl(query)
 	def get_backup_cluster(self, cluster_name):
