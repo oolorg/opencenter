@@ -38,7 +38,10 @@
         }
     },
     "horizon": {
-      "theme": "Rackspace"
+      "theme": "default",
+      "neutron": {
+        "enable_lb": "${facts['neutron_lbaas_enabled']}"
+      }
     },
     "glance": {
         "image" : {
@@ -64,7 +67,12 @@
             "fixed_range": "${facts['nova_vm_fixed_range']}",
             "dmz_cidr": "${facts['nova_dmz_cidr']}",
             "multi_host": true,
-            "public_interface": "${facts['nova_public_if']}"
+            "public_interface": "${facts['nova_public_if']}",
+% if facts['network_provider'] == "quantum" :
+            "provider": "neutron"
+% else :
+            "provider": "${facts['network_provider']}"
+% endif
         },
         "apply_patches": true,
         "networks": {
@@ -78,6 +86,25 @@
                     "dns1": "8.8.8.8",
                     "dns2": "8.8.4.4"
                 }
+        }
+    },
+    "neutron": {
+        "plugin": "${facts['neutron_plugin']}",
+        "ovs": {
+            "network_type": "${facts['neutron_ovs_network_type']}",
+            "external_bridge": "${facts['neutron_ovs_ext_bridge']}",
+            "external_interface": "${facts['neutron_ovs_ext_if']}"
+        },
+        "nec": {
+            "ofc_host": "${facts['neutron_ofc_host']}",
+            "openflow_interface": "${facts['neutron_of_if']}"
+        },
+        "ryu": {
+            "ofc_host": "${facts['neutron_ofc_host']}",
+            "tunnel_if": "${facts['nova_vm_fixed_if']}"
+        },
+        "lbaas": {
+            "enabled": "${facts['neutron_lbaas_enabled']}"
         }
     },
     "osops_networks": {
