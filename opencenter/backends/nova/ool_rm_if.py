@@ -504,7 +504,10 @@ class ool_rm_if_getImpl(ool_rm_if_common):
 				for i in range(0, len(sw_info_wk)):
 					sw_wk=self.__list2dict__(sw_info_wk[i])
 					sw_data.append(sw_wk['device_name'])
-					sw_data.append(sw_wk['vender_name'])
+					if 'vender_name' in sw_wk:
+						sw_data.append(sw_wk['vender_name'])
+					else:
+						sw_data.append('')
 			else:
 				sw_data = self.__list2dict__(sw_info[1])
 		return [0, sw_data]

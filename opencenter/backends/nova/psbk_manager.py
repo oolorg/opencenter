@@ -30,7 +30,7 @@ PICA8_KEY1="P-3290"
 PICA8_KEY2="P-3295"
 RIAVA_KEY1="BCM56846"
 PFS_KEY1="PF5240"
-CENTEC_KEY1="48T4X"
+CENTEC_KEY1="V350"
 #-------------------------------------------------------
 class psbk_manager:
 

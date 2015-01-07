@@ -76,14 +76,6 @@ BACKUP_DATA_KEY_P_ID     ="parent_id"
 BACKUP_DATA_KEY_BACKENDS ="backends"
 BACKUP_DATA_KEY_N_ID ="id"
 
-
-BR_AGENT_SRC_DIR='/etc/backuprestore'
-BR_AGENT_DST_DIR='/boot'
-
-BR_ORG_UPDATE='br.org_update'
-BR_ORG='br.org'
-
-
 ###############################
 #Server Backup Up Manager
 ###############################
@@ -463,6 +455,9 @@ class svbk_manager:
 
     def set_server_info_CPlane(self, node_id, server_info_list,server_name, name, br_mode):
         return self.set_server_info_Common(node_id, server_info_list,server_name, name, br_mode, 'C-Plane')
+
+    def set_server_info_SPlane(self, node_id, server_info_list,server_name, name, br_mode):
+        return self.set_server_info_Common(node_id, server_info_list,server_name, name, br_mode, 'S-Plane')
 
     def set_server_info_Common(self, node_id, server_info_list,server_name, name, br_mode, Plane):
 
@@ -1307,7 +1302,7 @@ class svbk_manager:
                 return [NG, msg]
 
             #exec br_agent
-            cmd='ssh root@%s /boot/%s %s %s b %s' %(server_info[i][IP_INDEX], svbkutl.get_br_agent_name(), server_info[i][USER_INDEX], server_info[i][PW_INDEX], SAVE_DIR_NAME)
+            cmd='ssh root@%s /boot/%s %s %s b %s %s %s %s' %(server_info[i][IP_INDEX], svbkutl.get_br_agent_name(), server_info[i][USER_INDEX], server_info[i][PW_INDEX], SAVE_DIR_NAME, server_info[STORAGE_SV][IP_INDEX], server_info[STORAGE_SV][USER_INDEX],  server_info[STORAGE_SV][PW_INDEX])
             ret = self.shellcmd_exec(EXEC_USER,br_mode, node_id, CLSTER_NAME, cmd)
             if ret!=0:
                 msg='make run backup  [%s] err ' % (server_info[i][IP_INDEX])
@@ -1800,7 +1795,7 @@ class svbk_manager:
                 self.br_log(node_id, CLSTER_NAME, br_mode, msg )
                 return [NG, msg]
 
-            cmd='ssh root@%s /boot/%s %s %s r %s' %(server_info[i][IP_INDEX], svbkutl.get_br_agent_name(), server_info[i][USER_INDEX], server_info[i][PW_INDEX], SAVE_DIR_NAME)
+            cmd='ssh root@%s /boot/%s %s %s r %s %s %s %s' %(server_info[i][IP_INDEX], svbkutl.get_br_agent_name(), server_info[i][USER_INDEX], server_info[i][PW_INDEX], SAVE_DIR_NAME, server_info[STORAGE_SV][IP_INDEX], server_info[STORAGE_SV][USER_INDEX],  server_info[STORAGE_SV][PW_INDEX])
             ret = self.shellcmd_exec(EXEC_USER,br_mode, node_id, CLSTER_NAME, cmd)
             if ret!=0:
                 msg='make run resotre  [%s] err ' % (server_info[i][IP_INDEX])
